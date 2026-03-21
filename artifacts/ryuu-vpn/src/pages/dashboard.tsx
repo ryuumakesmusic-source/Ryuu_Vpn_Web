@@ -156,7 +156,7 @@ export default function DashboardPage() {
       <nav className="border-b border-white/5 bg-background/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <a href="/" className="flex items-center gap-2">
-            <img src="/brand-icon.png" className="w-8 h-8" alt="RYUU VPN" />
+            <img src="https://assets.streamlinehq.com/image/private/w_300,h_300,ar_1/f_auto/v1/icons/interface-essential/check-badge-89c8o2nllxjypnppfmi9xm.png/check-badge-t05f9l6xba1iwy9pjudt.png?_a=DATAiZAAZAA0" className="w-8 h-8" alt="RYUU VPN" />
             <span className="font-display font-bold text-xl tracking-widest">RYUU <span className="text-primary">VPN</span></span>
           </a>
           <div className="flex items-center gap-3">

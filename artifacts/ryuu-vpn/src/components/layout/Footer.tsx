@@ -1,6 +1,9 @@
 import { Link } from "wouter";
 
 export function Footer() {
+  const logoUrl =
+    "https://assets.streamlinehq.com/image/private/w_300,h_300,ar_1/f_auto/v1/icons/interface-essential/check-badge-89c8o2nllxjypnppfmi9xm.png/check-badge-t05f9l6xba1iwy9pjudt.png?_a=DATAiZAAZAA0";
+
   return (
     <footer className="border-t border-white/5 bg-black/50 pt-20 pb-8 relative overflow-hidden">
       <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-primary/5 blur-[150px] rounded-full pointer-events-none" />
@@ -9,7 +12,7 @@ export function Footer() {
         <div className="flex flex-col md:flex-row justify-between items-start gap-12 mb-16">
           <div className="max-w-sm">
             <Link href="/" className="flex items-center gap-3 mb-6 opacity-80 hover:opacity-100 transition-opacity">
-              <img src="/brand-icon.png" alt="RYUU VPN Logo" className="w-8 h-8 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
+              <img src={logoUrl} alt="RYUU VPN Logo" className="w-8 h-8 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
               <span className="font-display font-bold text-xl tracking-widest text-foreground">
                 RYUU <span className="text-primary">VPN</span>
               </span>

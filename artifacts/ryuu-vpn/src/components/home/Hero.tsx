@@ -2,6 +2,9 @@ import { AuthModal } from "@/components/shared/AuthModal";
 import { motion } from "framer-motion";
 
 export function Hero() {
+  const logoUrl =
+    "https://assets.streamlinehq.com/image/private/w_300,h_300,ar_1/f_auto/v1/icons/interface-essential/check-badge-89c8o2nllxjypnppfmi9xm.png/check-badge-t05f9l6xba1iwy9pjudt.png?_a=DATAiZAAZAA0";
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background: CSS grid + glows */}
@@ -37,7 +40,7 @@ export function Hero() {
         >
           <div className="absolute inset-0 bg-primary/25 blur-[60px] rounded-full scale-150" />
           <img
-            src="/brand-icon.png"
+            src={logoUrl}
             alt="RYUU VPN Secure Badge"
             className="relative w-32 h-32 md:w-44 md:h-44 drop-shadow-[0_0_40px_rgba(168,85,247,0.8)]"
           />

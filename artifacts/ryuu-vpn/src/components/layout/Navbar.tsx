@@ -11,6 +11,9 @@ export function Navbar() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
 
+  const logoUrl =
+    "https://assets.streamlinehq.com/image/private/w_300,h_300,ar_1/f_auto/v1/icons/interface-essential/check-badge-89c8o2nllxjypnppfmi9xm.png/check-badge-t05f9l6xba1iwy9pjudt.png?_a=DATAiZAAZAA0";
+
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
@@ -29,7 +32,7 @@ export function Navbar() {
         <div className="flex justify-between items-center h-20 md:h-24">
           <Link href="/" className="flex items-center gap-3 group">
             <img
-              src="/brand-icon.png"
+              src={logoUrl}
               alt="RYUU VPN Logo"
               className="w-10 h-10 md:w-12 md:h-12 drop-shadow-[0_0_10px_rgba(168,85,247,0.8)] group-hover:scale-105 transition-transform"
             />
