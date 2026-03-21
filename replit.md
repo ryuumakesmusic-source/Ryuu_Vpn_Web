@@ -91,6 +91,31 @@ Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used b
 
 Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
 
+### `artifacts/ryuu-vpn` (`@workspace/ryuu-vpn`)
+
+React + Vite frontend for the RYUU VPN shop. Dark cyberpunk-themed.
+
+- Full homepage: Navbar, Hero, Stats, Features, Pricing, Testimonials, FAQ, Footer
+- Announcement popup modal (Myanmar/English, session-only)
+- Auth modal: Login + Register tabs (real API calls to api-server)
+- Dashboard page (`/dashboard`): live data usage, plan info, expiry, subscription link
+- Auth state via `AuthContext` + localStorage JWT token
+- API calls proxied through Vite dev server to `api-server` on port 8080
+- Routes: `/` (home), `/dashboard` (protected)
+
+### `artifacts/api-server` (`@workspace/api-server` — updated)
+
+Now includes full auth + Remnawave integration:
+
+- `src/routes/auth.ts` — POST /api/auth/register, POST /api/auth/login, GET /api/auth/me
+- `src/routes/dashboard.ts` — GET /api/dashboard/stats, GET /api/dashboard/subscription
+- `src/lib/remnawave.ts` — Remnawave panel API client (createUser, getUser, bandwidth, subscription)
+- `src/lib/jwt.ts` — JWT sign/verify using SESSION_SECRET
+- `src/lib/plans.ts` — Plan definitions (starter/premium/ultra)
+- `src/middlewares/auth.ts` — Bearer token auth middleware
+- Dev script changed to `tsx watch` for hot reload
+- Required env: `REMNAWAVE_URL` (env var), `REMNAWAVE_API_KEY` (secret), `SESSION_SECRET` (secret), `DATABASE_URL` (secret)
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.

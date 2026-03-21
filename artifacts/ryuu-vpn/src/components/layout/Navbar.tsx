@@ -1,12 +1,15 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { AuthModal } from "@/components/shared/AuthModal";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LayoutDashboard } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const { user } = useAuth();
+  const [, navigate] = useLocation();
 
   const logoUrl =
     "https://assets.streamlinehq.com/image/private/w_300,h_300,ar_1/f_auto/v1/icons/interface-essential/check-badge-89c8o2nllxjypnppfmi9xm.png/check-badge-t05f9l6xba1iwy9pjudt.png?_a=DATAiZAAZAA0";
@@ -54,11 +57,21 @@ export function Navbar() {
           </div>
 
           <div className="hidden md:block">
-            <AuthModal>
-              <Button className="h-11 px-6 font-display font-bold text-sm tracking-wider bg-primary/10 text-primary border border-primary/50 hover:bg-primary hover:text-primary-foreground transition-all shadow-[0_0_15px_-3px_rgba(168,85,247,0.3)] hover:shadow-[0_0_20px_rgba(168,85,247,0.6)]">
-                GET STARTED
+            {user ? (
+              <Button
+                onClick={() => navigate("/dashboard")}
+                className="h-11 px-6 font-display font-bold text-sm tracking-wider bg-primary/10 text-primary border border-primary/50 hover:bg-primary hover:text-primary-foreground transition-all shadow-[0_0_15px_-3px_rgba(168,85,247,0.3)] hover:shadow-[0_0_20px_rgba(168,85,247,0.6)] flex items-center gap-2"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                DASHBOARD
               </Button>
-            </AuthModal>
+            ) : (
+              <AuthModal>
+                <Button className="h-11 px-6 font-display font-bold text-sm tracking-wider bg-primary/10 text-primary border border-primary/50 hover:bg-primary hover:text-primary-foreground transition-all shadow-[0_0_15px_-3px_rgba(168,85,247,0.3)] hover:shadow-[0_0_20px_rgba(168,85,247,0.6)]">
+                  GET STARTED
+                </Button>
+              </AuthModal>
+            )}
           </div>
 
           <button
