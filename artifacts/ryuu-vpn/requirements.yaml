@@ -1,0 +1,16 @@
+packages:
+  "framer-motion": "For stunning scroll animations and page transitions required by the premium cyberpunk aesthetic"
+  "clsx": "For conditional class merging"
+  "tailwind-merge": "For merging tailwind classes seamlessly"
+
+images:
+  - path: "artifacts/ryuu-vpn/public/images/cyber-bg.png"
+    description: "Dark cyberpunk premium abstract background with glowing purple and blue digital neon nodes, deep black background, tech grid subtle overlay"
+    aspect_ratio: "16:9"
+  - path: "artifacts/ryuu-vpn/public/images/map-nodes.png"
+    description: "Abstract stylized world map in dark mode with glowing blue and purple connecting dots and lines, cyberpunk aesthetic, transparent background elements"
+    aspect_ratio: "16:9"
+
+notes:
+  - "The app uses a simulated useRegister mutation for auth/checkout forms since the backend API is not fully implemented yet."
+  - "Using framer-motion for micro-interactions to create a premium tech feel."
