@@ -240,6 +240,15 @@ CRON_CMD="0 3 * * * certbot renew --quiet && docker compose -f $APP_DIR/docker-c
 (crontab -l 2>/dev/null | grep -v "certbot renew"; echo "$CRON_CMD") | crontab -
 print_success "Auto-renewal cron job added (runs daily at 3am)"
 
+# ── Install daily backup cron job ─────────────────────────────────────────────
+print_step "Daily Telegram Backup"
+cp "$APP_DIR/deploy/backup.sh" "$APP_DIR/backup.sh"
+chmod +x "$APP_DIR/backup.sh"
+BACKUP_CRON="0 2 * * * bash $APP_DIR/backup.sh >> /var/log/ryuu-vpn-backup.log 2>&1"
+(crontab -l 2>/dev/null | grep -v "ryuu-vpn-backup"; echo "$BACKUP_CRON") | crontab -
+print_success "Backup cron job added (runs daily at 2am, logs → /var/log/ryuu-vpn-backup.log)"
+echo -e "  ${YELLOW}Run manually anytime:${NC}  bash $APP_DIR/backup.sh"
+
 # ── Create update helper script ───────────────────────────────────────────────
 cat > "$APP_DIR/update.sh" <<'UPDATEEOF'
 #!/bin/bash
