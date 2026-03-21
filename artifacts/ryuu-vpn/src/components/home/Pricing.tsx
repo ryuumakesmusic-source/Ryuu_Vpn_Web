@@ -12,7 +12,7 @@ const plans = [
     currency: "Ks",
     data: "50 GB",
     validity: "20 Days",
-    note: "Note: Data top-up not available for this plan.",
+    note: "✅ Rollover: Unused data carries over when you renew before expiry.",
     highlight: false,
     delay: 0.1,
   },
