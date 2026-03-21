@@ -10,24 +10,15 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
-const PLANS = [
-  { id: "starter", name: "STARTER", price: "3,000 Ks", data: "50 GB", days: "20 days" },
-  { id: "premium", name: "PREMIUM VALUE", price: "5,000 Ks", data: "120 GB", days: "30 days" },
-  { id: "ultra", name: "ULTRA PRO", price: "10,000 Ks", data: "250 GB", days: "30 days" },
-];
-
 export function AuthModal({
   children,
-  defaultPlan = "premium",
 }: {
   children: React.ReactNode;
-  defaultPlan?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [selectedPlan, setSelectedPlan] = useState(defaultPlan);
   const [loading, setLoading] = useState(false);
 
   const { login, register } = useAuth();
@@ -49,8 +40,8 @@ export function AuthModal({
         await login(username, password);
         toast({ title: "Welcome back!", description: `Logged in as ${username}` });
       } else {
-        await register(username, password, selectedPlan);
-        toast({ title: "Account Created!", description: "Your VPN account is now active." });
+        await register(username, password);
+        toast({ title: "Account Created!", description: "Top up your balance to activate a plan." });
       }
       setOpen(false);
       reset();
@@ -76,7 +67,6 @@ export function AuthModal({
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-md border-white/10 bg-[#0a0a14] backdrop-blur-2xl shadow-[0_0_60px_-15px_rgba(168,85,247,0.5)] p-0 overflow-hidden">
-        {/* Tab switcher */}
         <div className="flex border-b border-white/10">
           {(["login", "register"] as const).map((t) => (
             <button
@@ -97,15 +87,16 @@ export function AuthModal({
           <DialogHeader className="mb-6">
             <DialogTitle className="font-display text-2xl font-bold tracking-wide text-white uppercase">
               {tab === "login" ? (
-                <>
-                  Welcome <span className="text-primary">Back</span>
-                </>
+                <>Welcome <span className="text-primary">Back</span></>
               ) : (
-                <>
-                  Join <span className="text-primary">RYUU VPN</span>
-                </>
+                <>Join <span className="text-primary">RYUU VPN</span></>
               )}
             </DialogTitle>
+            {tab === "register" && (
+              <p className="text-sm text-white/40 mt-1">
+                Create your account, then top up your balance to activate a plan.
+              </p>
+            )}
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -122,7 +113,7 @@ export function AuthModal({
                 className="w-full h-12 px-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/25 focus:border-primary/60 focus:outline-none focus:ring-0 transition-colors text-sm"
               />
               {tab === "register" && (
-                <p className="text-xs text-white/30 mt-1.5">Lowercase letters, numbers, underscores only. 3–32 chars.</p>
+                <p className="text-xs text-white/30 mt-1.5">Lowercase letters, numbers, underscores. 3–32 chars.</p>
               )}
             </div>
 
@@ -143,49 +134,26 @@ export function AuthModal({
               )}
             </div>
 
-            {tab === "register" && (
-              <div>
-                <label className="text-xs font-bold uppercase tracking-widest text-white/50 block mb-3">
-                  Select Plan
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {PLANS.map((plan) => (
-                    <button
-                      key={plan.id}
-                      type="button"
-                      onClick={() => setSelectedPlan(plan.id)}
-                      className={`p-3 rounded-xl border text-center transition-all ${
-                        selectedPlan === plan.id
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-white/10 bg-white/[0.03] text-white/60 hover:border-white/20"
-                      }`}
-                    >
-                      <div className="text-xs font-bold tracking-wide mb-1">{plan.name}</div>
-                      <div className="text-base font-bold">{plan.data}</div>
-                      <div className="text-xs opacity-70 mt-0.5">{plan.price}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <button
               type="submit"
               disabled={loading}
               className="w-full h-13 py-3.5 rounded-xl bg-primary text-white font-display font-bold tracking-widest text-sm uppercase shadow-[0_0_25px_-5px_rgba(168,85,247,0.6)] hover:shadow-[0_0_40px_-5px_rgba(168,85,247,0.9)] hover:-translate-y-0.5 transition-all disabled:opacity-60 disabled:translate-y-0 disabled:cursor-not-allowed mt-2"
             >
-              {loading ? "Please wait..." : tab === "login" ? "Log In" : "Create Account & Activate VPN"}
+              {loading ? "Please wait..." : tab === "login" ? "Log In" : "Create Account"}
             </button>
 
-            {tab === "login" && (
+            {tab === "login" ? (
               <p className="text-center text-sm text-white/40">
                 Don't have an account?{" "}
-                <button
-                  type="button"
-                  onClick={() => setTab("register")}
-                  className="text-primary hover:underline font-medium"
-                >
+                <button type="button" onClick={() => setTab("register")} className="text-primary hover:underline font-medium">
                   Register here
+                </button>
+              </p>
+            ) : (
+              <p className="text-center text-sm text-white/40">
+                Already have an account?{" "}
+                <button type="button" onClick={() => setTab("login")} className="text-primary hover:underline font-medium">
+                  Log in
                 </button>
               </p>
             )}

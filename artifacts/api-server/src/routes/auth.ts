@@ -3,22 +3,19 @@ import bcrypt from "bcryptjs";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { signToken } from "../lib/jwt.js";
-import { createRemnawaveUser } from "../lib/remnawave.js";
-import { getPlan } from "../lib/plans.js";
 import type { AuthRequest } from "../middlewares/auth.js";
 import { requireAuth } from "../middlewares/auth.js";
 
 const router = Router();
 
 router.post("/register", async (req, res) => {
-  const { username, password, planId } = req.body as {
+  const { username, password } = req.body as {
     username: string;
     password: string;
-    planId: string;
   };
 
-  if (!username || !password || !planId) {
-    res.status(400).json({ error: "username, password, and planId are required" });
+  if (!username || !password) {
+    res.status(400).json({ error: "username and password are required" });
     return;
   }
 
@@ -31,12 +28,6 @@ router.post("/register", async (req, res) => {
 
   if (password.length < 6) {
     res.status(400).json({ error: "Password must be at least 6 characters" });
-    return;
-  }
-
-  const plan = getPlan(planId);
-  if (!plan) {
-    res.status(400).json({ error: "Invalid plan" });
     return;
   }
 
@@ -53,32 +44,9 @@ router.post("/register", async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  let remnawaveUuid: string | null = null;
-  let remnawaveShortUuid: string | null = null;
-
-  try {
-    const rwUser = await createRemnawaveUser(
-      username,
-      plan.trafficLimitBytes,
-      plan.validityDays,
-    );
-    remnawaveUuid = rwUser.uuid ?? null;
-    remnawaveShortUuid = rwUser.shortUuid ?? null;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(502).json({ error: `Failed to create VPN account: ${message}` });
-    return;
-  }
-
   const [user] = await db
     .insert(usersTable)
-    .values({
-      username,
-      passwordHash,
-      remnawaveUuid,
-      remnawaveShortUuid,
-      planId,
-    })
+    .values({ username, passwordHash })
     .returning();
 
   const token = signToken({ userId: user.id, username: user.username });
@@ -88,6 +56,7 @@ router.post("/register", async (req, res) => {
     user: {
       id: user.id,
       username: user.username,
+      balanceKs: user.balanceKs,
       planId: user.planId,
       createdAt: user.createdAt,
     },
@@ -126,7 +95,9 @@ router.post("/login", async (req, res) => {
     user: {
       id: user.id,
       username: user.username,
+      balanceKs: user.balanceKs,
       planId: user.planId,
+      isAdmin: user.isAdmin,
       createdAt: user.createdAt,
     },
   });
@@ -147,7 +118,9 @@ router.get("/me", requireAuth, async (req: AuthRequest, res) => {
   res.json({
     id: user.id,
     username: user.username,
+    balanceKs: user.balanceKs,
     planId: user.planId,
+    isAdmin: user.isAdmin,
     remnawaveUuid: user.remnawaveUuid,
     createdAt: user.createdAt,
   });
