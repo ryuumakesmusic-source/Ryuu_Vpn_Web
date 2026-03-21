@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { seedAdminUsers } from "./lib/seed.js";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,8 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  seedAdminUsers().catch((e) =>
+    logger.error({ err: e }, "Failed to seed admin users"),
+  );
 });
