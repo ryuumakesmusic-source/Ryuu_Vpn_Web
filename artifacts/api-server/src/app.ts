@@ -46,7 +46,8 @@ if (process.env.NODE_ENV === "production") {
   const staticDir = path.resolve(__dirname, "../../ryuu-vpn/dist/public");
   app.use(express.static(staticDir));
   // SPA fallback — let React Router handle client-side routes
-  app.get("*", (_req, res) => {
+  // Express 5 + path-to-regexp v8 requires named wildcards, bare "*" is invalid
+  app.get("/{*splat}", (_req, res) => {
     res.sendFile(path.join(staticDir, "index.html"));
   });
 }

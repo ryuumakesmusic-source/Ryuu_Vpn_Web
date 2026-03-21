@@ -1,0 +1,56 @@
+root@ubuntu-s-1vcpu-1gb-sgp1-01:~# docker compose -f /opt/ryuu-vpn/docker-compose.yml logs app --tail=50
+ryuu-vpn-app  |     at pathToRegexp (/app/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:480:54)
+ryuu-vpn-app  |     at Object.match (/app/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:438:28)
+ryuu-vpn-app  |     at matcher (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:86:23)
+ryuu-vpn-app  |     at new Layer (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:93:62)
+ryuu-vpn-app  |     at router7.route (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/index.js:428:17)
+ryuu-vpn-app  |     at app2.route (/app/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:257:22)
+ryuu-vpn-app  |     at app2.app2.<computed> (/app/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:478:22)
+ryuu-vpn-app  |     at <anonymous> (/app/artifacts/api-server/src/app.ts:49:7) {
+ryuu-vpn-app  |   originalPath: '*'
+ryuu-vpn-app  | }
+ryuu-vpn-app  |
+ryuu-vpn-app  | Node.js v24.14.0
+ryuu-vpn-app  | /app/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:225
+ryuu-vpn-app  |       throw new PathError(`Missing parameter name at index ${index}`, str);
+ryuu-vpn-app  |             ^
+ryuu-vpn-app  |
+ryuu-vpn-app  | PathError [TypeError]: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+ryuu-vpn-app  |     at name (/app/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:225:13)
+ryuu-vpn-app  |     at parse (/app/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:242:62)
+ryuu-vpn-app  |     at pathToRegexp (/app/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:480:54)
+ryuu-vpn-app  |     at Object.match (/app/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:438:28)
+ryuu-vpn-app  |     at matcher (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:86:23)
+ryuu-vpn-app  |     at new Layer (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:93:62)
+ryuu-vpn-app  |     at router7.route (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/index.js:428:17)
+ryuu-vpn-app  |     at app2.route (/app/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:257:22)
+ryuu-vpn-app  |     at app2.app2.<computed> (/app/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:478:22)
+ryuu-vpn-app  |     at <anonymous> (/app/artifacts/api-server/src/app.ts:49:7) {
+ryuu-vpn-app  |   originalPath: '*'
+ryuu-vpn-app  | }
+ryuu-vpn-app  |
+ryuu-vpn-app  | Node.js v24.14.0
+ryuu-vpn-app  | /app/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:225
+ryuu-vpn-app  |       throw new PathError(`Missing parameter name at index ${index}`, str);
+ryuu-vpn-app  |             ^
+ryuu-vpn-app  |
+ryuu-vpn-app  | PathError [TypeError]: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+ryuu-vpn-app  |     at name (/app/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:225:13)
+ryuu-vpn-app  |     at parse (/app/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:242:62)
+ryuu-vpn-app  |     at pathToRegexp (/app/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:480:54)
+ryuu-vpn-app  |     at Object.match (/app/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:438:28)
+ryuu-vpn-app  |     at matcher (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:86:23)
+ryuu-vpn-app  |     at new Layer (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:93:62)
+ryuu-vpn-app  |     at router7.route (/app/node_modules/.pnpm/router@2.2.0/node_modules/router/index.js:428:17)
+ryuu-vpn-app  |     at app2.route (/app/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:257:22)
+ryuu-vpn-app  |     at app2.app2.<computed> (/app/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:478:22)
+ryuu-vpn-app  |     at <anonymous> (/app/artifacts/api-server/src/app.ts:49:7) {
+ryuu-vpn-app  |   originalPath: '*'
+ryuu-vpn-app  | }
+ryuu-vpn-app  |
+ryuu-vpn-app  | Node.js v24.14.0
+root@ubuntu-s-1vcpu-1gb-sgp1-01:~# docker compose -f /opt/ryuu-vpn/docker-compose.yml ps
+NAME             IMAGE                COMMAND                  SERVICE   CREATED         STATUS                          PORTS
+ryuu-vpn-app     ryuu-vpn-app         "docker-entrypoint.s…"   app       7 minutes ago   Restarting (1) 28 seconds ago  
+ryuu-vpn-db      postgres:16-alpine   "docker-entrypoint.s…"   db        7 minutes ago   Up 7 minutes (healthy)          5432/tcp
+ryuu-vpn-nginx   nginx:alpine         "/docker-entrypoint.…"   nginx     7 minutes ago   Up 7 minutes                    0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
