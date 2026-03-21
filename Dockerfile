@@ -20,6 +20,7 @@ COPY tsconfig.json tsconfig.base.json ./
 
 # Source packages
 COPY lib/ ./lib/
+COPY scripts/ ./scripts/
 COPY artifacts/api-server/ ./artifacts/api-server/
 COPY artifacts/ryuu-vpn/ ./artifacts/ryuu-vpn/
 
