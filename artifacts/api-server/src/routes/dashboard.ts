@@ -1,11 +1,20 @@
 import { Router } from "express";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, planPurchasesTable } from "@workspace/db";
+import { eq, and, gte, count } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../middlewares/auth.js";
-import { getRemnawaveUser, getUserBandwidth, getSubscription, createRemnawaveUser, updateRemnawaveUserPlan } from "../lib/remnawave.js";
+import {
+  getRemnawaveUser,
+  getUserBandwidth,
+  getSubscription,
+  createRemnawaveUser,
+  renewRemnawaveUserPlan,
+} from "../lib/remnawave.js";
 import { getPlan, PLANS } from "../lib/plans.js";
 
 const router = Router();
+
+const MONTHLY_PURCHASE_LIMIT = 2;
+const PREMIUM_PLAN_IDS = ["premium", "ultra"];
 
 router.get("/stats", requireAuth, async (req: AuthRequest, res) => {
   const [user] = await db
@@ -93,6 +102,35 @@ router.get("/plans", (_req, res) => {
   res.json(Object.values(PLANS));
 });
 
+router.get("/purchase-status", requireAuth, async (req: AuthRequest, res) => {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [{ purchasesThisMonth }] = await db
+    .select({ purchasesThisMonth: count() })
+    .from(planPurchasesTable)
+    .where(
+      and(
+        eq(planPurchasesTable.userId, req.user!.userId),
+        gte(planPurchasesTable.purchasedAt, monthStart),
+      ),
+    );
+
+  const [user] = await db
+    .select({ planId: usersTable.planId })
+    .from(usersTable)
+    .where(eq(usersTable.id, req.user!.userId))
+    .limit(1);
+
+  res.json({
+    purchasesThisMonth: Number(purchasesThisMonth),
+    monthlyLimit: MONTHLY_PURCHASE_LIMIT,
+    remainingPurchases: Math.max(0, MONTHLY_PURCHASE_LIMIT - Number(purchasesThisMonth)),
+    currentPlanId: user?.planId ?? null,
+    canBuyStarter: !PREMIUM_PLAN_IDS.includes(user?.planId ?? ""),
+  });
+});
+
 router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
   const { planId } = req.body as { planId: string };
 
@@ -113,9 +151,41 @@ router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
     return;
   }
 
+  // Rule 1 — max 2 purchases per calendar month
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const [{ purchasesThisMonth }] = await db
+    .select({ purchasesThisMonth: count() })
+    .from(planPurchasesTable)
+    .where(
+      and(
+        eq(planPurchasesTable.userId, user.id),
+        gte(planPurchasesTable.purchasedAt, monthStart),
+      ),
+    );
+
+  if (Number(purchasesThisMonth) >= MONTHLY_PURCHASE_LIMIT) {
+    res.status(403).json({
+      error: `You've already purchased ${MONTHLY_PURCHASE_LIMIT} plans this month. Your limit resets on the 1st of next month.`,
+      code: "MONTHLY_LIMIT_REACHED",
+    });
+    return;
+  }
+
+  // Rule 2 — no downgrade: Premium/Ultra users cannot buy Starter
+  if (PREMIUM_PLAN_IDS.includes(user.planId ?? "") && planId === "starter") {
+    res.status(403).json({
+      error: "Your current plan is Premium or Ultra. You cannot downgrade to Starter. Please choose Premium or Ultra.",
+      code: "DOWNGRADE_BLOCKED",
+    });
+    return;
+  }
+
+  // Rule 3 — sufficient balance
   if (user.balanceKs < plan.priceKs) {
     res.status(402).json({
       error: `Insufficient balance. You need ${plan.priceKs.toLocaleString()} Ks but have ${user.balanceKs.toLocaleString()} Ks.`,
+      code: "INSUFFICIENT_BALANCE",
     });
     return;
   }
@@ -125,8 +195,8 @@ router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
 
   try {
     if (user.remnawaveUuid) {
-      // Existing user: reset traffic to 0 and update plan limits — no data carryover
-      await updateRemnawaveUserPlan(
+      // Existing user: extend their data (no traffic reset, carry forward)
+      await renewRemnawaveUserPlan(
         user.remnawaveUuid,
         plan.trafficLimitBytes,
         plan.validityDays,
@@ -149,18 +219,35 @@ router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
 
   const newBalance = user.balanceKs - plan.priceKs;
 
-  await db
-    .update(usersTable)
-    .set({
-      balanceKs: newBalance,
+  // Record the purchase and update user in parallel
+  await Promise.all([
+    db.insert(planPurchasesTable).values({
+      userId: user.id,
       planId,
-      remnawaveUuid,
-      remnawaveShortUuid,
-      updatedAt: new Date(),
-    })
-    .where(eq(usersTable.id, user.id));
+      priceKs: String(plan.priceKs),
+    }),
+    db
+      .update(usersTable)
+      .set({
+        balanceKs: newBalance,
+        planId,
+        remnawaveUuid,
+        remnawaveShortUuid,
+        updatedAt: new Date(),
+      })
+      .where(eq(usersTable.id, user.id)),
+  ]);
 
-  res.json({ success: true, newBalance, planId, planName: plan.name });
+  const purchasesAfter = Number(purchasesThisMonth) + 1;
+
+  res.json({
+    success: true,
+    newBalance,
+    planId,
+    planName: plan.name,
+    purchasesThisMonth: purchasesAfter,
+    remainingPurchases: Math.max(0, MONTHLY_PURCHASE_LIMIT - purchasesAfter),
+  });
 });
 
 export default router;

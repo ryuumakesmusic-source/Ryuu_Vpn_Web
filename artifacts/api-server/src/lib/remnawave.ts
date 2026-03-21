@@ -59,26 +59,29 @@ export async function createRemnawaveUser(
   return data?.response ?? data;
 }
 
-export async function updateRemnawaveUserPlan(
+export async function renewRemnawaveUserPlan(
   uuid: string,
-  trafficLimitBytes: number,
+  additionalTrafficBytes: number,
   validityDays: number,
 ): Promise<RemnawaveUser> {
+  // Fetch current used traffic so we can carry the data forward
+  const current = await rwFetch(`/api/users/${uuid}`);
+  const currentUser: RemnawaveUser = current?.response ?? current;
+  const usedBytes: number = currentUser.usedTrafficBytes ?? 0;
+
+  // New limit = what they've already used + fresh allocation from the new plan
+  // This gives them exactly the plan's GB amount as fresh usable data
+  const newTrafficLimitBytes = usedBytes + additionalTrafficBytes;
+
+  // Expiry starts fresh from today + plan validity
   const expireAt = new Date();
   expireAt.setDate(expireAt.getDate() + validityDays);
 
-  // Step 1: Reset traffic to zero — no leftover data from previous plan
-  await rwFetch(`/api/users/${uuid}/actions/reset-traffic`, {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
-
-  // Step 2: Update limits, expiry and ensure squad is still assigned
   const data = await rwFetch("/api/users", {
     method: "PATCH",
     body: JSON.stringify({
       uuid,
-      trafficLimitBytes,
+      trafficLimitBytes: newTrafficLimitBytes,
       expireAt: expireAt.toISOString(),
       activeInternalSquads: [DEFAULT_SQUAD_UUID],
     }),
