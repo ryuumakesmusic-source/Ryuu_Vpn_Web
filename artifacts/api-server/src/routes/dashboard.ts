@@ -250,4 +250,129 @@ router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
   });
 });
 
+router.post("/gift-plan", requireAuth, async (req: AuthRequest, res) => {
+  const { recipientUsername, planId } = req.body as { recipientUsername: string; planId: string };
+
+  const plan = getPlan(planId);
+  if (!plan) {
+    res.status(400).json({ error: "Invalid plan" });
+    return;
+  }
+
+  const [buyer] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, req.user!.userId))
+    .limit(1);
+
+  if (!buyer) {
+    res.status(404).json({ error: "Buyer not found" });
+    return;
+  }
+
+  // Cannot gift to yourself
+  if (buyer.username.toLowerCase() === recipientUsername.trim().toLowerCase()) {
+    res.status(400).json({ error: "You cannot gift a plan to yourself.", code: "SELF_GIFT" });
+    return;
+  }
+
+  // Look up recipient
+  const [recipient] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.username, recipientUsername.trim()))
+    .limit(1);
+
+  if (!recipient) {
+    res.status(404).json({
+      error: `No account found with username "${recipientUsername.trim()}". They need to register first.`,
+      code: "RECIPIENT_NOT_FOUND",
+    });
+    return;
+  }
+
+  // Check recipient's monthly purchase count
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const [{ purchasesThisMonth }] = await db
+    .select({ purchasesThisMonth: count() })
+    .from(planPurchasesTable)
+    .where(
+      and(
+        eq(planPurchasesTable.userId, recipient.id),
+        gte(planPurchasesTable.purchasedAt, monthStart),
+      ),
+    );
+
+  if (Number(purchasesThisMonth) >= MONTHLY_PURCHASE_LIMIT) {
+    res.status(403).json({
+      error: `${recipient.username} has already received ${MONTHLY_PURCHASE_LIMIT} plans this month. Their limit resets on the 1st of next month.`,
+      code: "RECIPIENT_MONTHLY_LIMIT_REACHED",
+    });
+    return;
+  }
+
+  // Downgrade rule — based on recipient's current plan
+  if (PREMIUM_PLAN_IDS.includes(recipient.planId ?? "") && planId === "starter") {
+    res.status(403).json({
+      error: `${recipient.username} is already on a Premium or Ultra plan. You cannot gift them a Starter plan.`,
+      code: "RECIPIENT_DOWNGRADE_BLOCKED",
+    });
+    return;
+  }
+
+  // Buyer must have enough balance
+  if (buyer.balanceKs < plan.priceKs) {
+    res.status(402).json({
+      error: `Insufficient balance. You need ${plan.priceKs.toLocaleString()} Ks but have ${buyer.balanceKs.toLocaleString()} Ks.`,
+      code: "INSUFFICIENT_BALANCE",
+    });
+    return;
+  }
+
+  // Activate on Remnawave for recipient
+  let remnawaveUuid = recipient.remnawaveUuid;
+  let remnawaveShortUuid = recipient.remnawaveShortUuid;
+
+  try {
+    if (recipient.remnawaveUuid) {
+      await renewRemnawaveUserPlan(recipient.remnawaveUuid, plan.trafficLimitBytes, plan.validityDays);
+    } else {
+      const rwUser = await createRemnawaveUser(recipient.username, plan.trafficLimitBytes, plan.validityDays);
+      remnawaveUuid = rwUser.uuid ?? remnawaveUuid;
+      remnawaveShortUuid = rwUser.shortUuid ?? remnawaveShortUuid;
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Failed to activate VPN: ${msg}` });
+    return;
+  }
+
+  const newBuyerBalance = buyer.balanceKs - plan.priceKs;
+
+  await Promise.all([
+    db.insert(planPurchasesTable).values({
+      userId: recipient.id,
+      planId,
+      priceKs: String(plan.priceKs),
+    }),
+    db
+      .update(usersTable)
+      .set({ balanceKs: newBuyerBalance, updatedAt: new Date() })
+      .where(eq(usersTable.id, buyer.id)),
+    db
+      .update(usersTable)
+      .set({ planId, remnawaveUuid, remnawaveShortUuid, updatedAt: new Date() })
+      .where(eq(usersTable.id, recipient.id)),
+  ]);
+
+  res.json({
+    success: true,
+    newBalance: newBuyerBalance,
+    recipientUsername: recipient.username,
+    planId,
+    planName: plan.name,
+  });
+});
+
 export default router;

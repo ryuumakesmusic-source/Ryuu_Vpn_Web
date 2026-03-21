@@ -102,6 +102,9 @@ export const api = {
   buyPlan: (planId: string): Promise<{ success: boolean; newBalance: number; planId: string; planName: string }> =>
     apiFetch("/dashboard/buy-plan", { method: "POST", body: JSON.stringify({ planId }) }),
 
+  giftPlan: (recipientUsername: string, planId: string): Promise<{ success: boolean; newBalance: number; recipientUsername: string; planId: string; planName: string }> =>
+    apiFetch("/dashboard/gift-plan", { method: "POST", body: JSON.stringify({ recipientUsername, planId }) }),
+
   submitTopup: (amountKs: number, paymentMethod: string, screenshot: File): Promise<{ id: string; status: string }> => {
     const token = localStorage.getItem("ryuu_token");
     const form = new FormData();

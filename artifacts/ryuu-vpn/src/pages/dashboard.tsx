@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { api, type DashboardStats, type SubscriptionInfo, type Plan } from "@/lib/api";
-import { LogOut, Copy, Check, Wifi, Shield, Clock, Database, Wallet, ShoppingCart, ArrowUpRight } from "lucide-react";
+import { LogOut, Copy, Check, Wifi, Shield, Clock, Database, Wallet, ShoppingCart, ArrowUpRight, Gift, X, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 function StatusBadge({ status }: { status: string }) {
@@ -73,6 +73,10 @@ export default function DashboardPage() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [buyingPlan, setBuyingPlan] = useState<string | null>(null);
+  const [giftModalOpen, setGiftModalOpen] = useState(false);
+  const [giftUsername, setGiftUsername] = useState("");
+  const [giftPlanId, setGiftPlanId] = useState<string | null>(null);
+  const [gifting, setGifting] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/");
@@ -107,6 +111,29 @@ export default function DashboardPage() {
       });
     } finally {
       setBuyingPlan(null);
+    }
+  };
+
+  const handleGiftPlan = async () => {
+    if (!giftUsername.trim() || !giftPlanId) return;
+    setGifting(true);
+    try {
+      const result = await api.giftPlan(giftUsername.trim(), giftPlanId);
+      toast({ title: "Gift Sent! 🎁", description: `${result.planName} gifted to ${result.recipientUsername}.` });
+      setGiftModalOpen(false);
+      setGiftUsername("");
+      setGiftPlanId(null);
+      await refreshUser();
+      const newStats = await api.stats();
+      setStats(newStats);
+    } catch (err) {
+      toast({
+        title: "Gift Failed",
+        description: err instanceof Error ? err.message : "Something went wrong",
+        variant: "destructive",
+      });
+    } finally {
+      setGifting(false);
     }
   };
 
@@ -283,9 +310,18 @@ export default function DashboardPage() {
             {/* Buy a Plan */}
             <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }}
               className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
-              <div className="flex items-center gap-2 mb-5">
-                <ShoppingCart className="w-4 h-4 text-primary" />
-                <span className="text-xs font-bold uppercase tracking-widest text-white/50">Buy a Plan</span>
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="w-4 h-4 text-primary" />
+                  <span className="text-xs font-bold uppercase tracking-widest text-white/50">Buy a Plan</span>
+                </div>
+                <button
+                  onClick={() => setGiftModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-500/10 border border-pink-500/30 text-pink-400 text-xs font-bold hover:bg-pink-500/20 transition-all"
+                >
+                  <Gift className="w-3.5 h-3.5" />
+                  Gift a Plan
+                </button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {plans.map((plan) => {
@@ -331,6 +367,96 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* Gift Plan Modal */}
+      {giftModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setGiftModalOpen(false); }}>
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-full max-w-md bg-[#0f0f17] border border-white/10 rounded-2xl p-6 shadow-2xl"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <Gift className="w-5 h-5 text-pink-400" />
+                <h2 className="font-display font-bold text-white text-lg uppercase tracking-wide">Gift a Plan</h2>
+              </div>
+              <button onClick={() => setGiftModalOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-all">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Recipient */}
+            <div className="mb-5">
+              <label className="text-xs font-bold uppercase tracking-widest text-white/50 block mb-2">
+                Recipient Username
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                <input
+                  type="text"
+                  value={giftUsername}
+                  onChange={(e) => setGiftUsername(e.target.value)}
+                  placeholder="Enter their username..."
+                  className="w-full h-11 pl-9 pr-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/25 focus:border-pink-500/60 focus:outline-none text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Plan selector */}
+            <div className="mb-6">
+              <label className="text-xs font-bold uppercase tracking-widest text-white/50 block mb-2">
+                Choose Plan to Gift
+              </label>
+              <div className="grid gap-2">
+                {plans.map((plan) => {
+                  const canAfford = (stats?.balanceKs ?? user?.balanceKs ?? 0) >= plan.priceKs;
+                  return (
+                    <button
+                      key={plan.id}
+                      type="button"
+                      onClick={() => canAfford && setGiftPlanId(plan.id)}
+                      className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
+                        giftPlanId === plan.id
+                          ? "border-pink-500/60 bg-pink-500/10"
+                          : canAfford
+                          ? "border-white/10 bg-white/[0.02] hover:border-white/20"
+                          : "border-white/5 bg-white/[0.01] opacity-40 cursor-not-allowed"
+                      }`}
+                    >
+                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 transition-colors ${
+                        giftPlanId === plan.id ? "border-pink-400 bg-pink-400" : "border-white/30"
+                      }`} />
+                      <span className="font-bold text-white text-sm">{plan.name}</span>
+                      <span className="text-white/40 text-xs">{plan.dataGb} GB · {plan.validityDays}d</span>
+                      <span className={`ml-auto font-bold text-sm ${canAfford ? "text-pink-400" : "text-white/30"}`}>
+                        {plan.priceKs.toLocaleString()} Ks
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setGiftModalOpen(false)}
+                className="flex-1 py-3 rounded-xl border border-white/10 text-white/60 text-sm font-bold hover:bg-white/5 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGiftPlan}
+                disabled={!giftUsername.trim() || !giftPlanId || gifting}
+                className="flex-1 py-3 rounded-xl bg-pink-500 text-white text-sm font-bold uppercase tracking-wider hover:bg-pink-400 hover:-translate-y-0.5 transition-all disabled:opacity-40 disabled:translate-y-0 disabled:cursor-not-allowed shadow-[0_0_20px_-5px_rgba(236,72,153,0.6)]"
+              >
+                {gifting ? "Sending..." : "Send Gift 🎁"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
