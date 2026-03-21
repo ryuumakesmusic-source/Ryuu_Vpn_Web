@@ -4,6 +4,8 @@ const API_KEY = process.env.REMNAWAVE_API_KEY;
 if (!BASE_URL) throw new Error("REMNAWAVE_URL is not set");
 if (!API_KEY) throw new Error("REMNAWAVE_API_KEY is not set");
 
+const DEFAULT_SQUAD_UUID = "cc8bf98f-8581-4dd0-b7ff-bc9c93a3cc61";
+
 async function rwFetch(path: string, options: RequestInit = {}) {
   const url = `${BASE_URL}${path}`;
   const res = await fetch(url, {
@@ -34,17 +36,6 @@ export interface RemnawaveUser {
   subscriptionUrl: string;
 }
 
-export interface RemnawaveInbound {
-  uuid: string;
-  tag: string;
-  type: string;
-}
-
-export async function getInbounds(): Promise<RemnawaveInbound[]> {
-  const data = await rwFetch("/api/inbounds");
-  return data?.response ?? data ?? [];
-}
-
 export async function createRemnawaveUser(
   username: string,
   trafficLimitBytes: number,
@@ -53,24 +44,13 @@ export async function createRemnawaveUser(
   const expireAt = new Date();
   expireAt.setDate(expireAt.getDate() + validityDays);
 
-  let inboundUuids: string[] = [];
-  try {
-    const inbounds = await getInbounds();
-    inboundUuids = inbounds.map((i) => i.uuid);
-  } catch {
-    // If we can't fetch inbounds, proceed with empty array
-  }
-
-  const body: Record<string, unknown> = {
+  const body = {
     username,
     trafficLimitBytes,
     expireAt: expireAt.toISOString(),
     trafficLimitStrategy: "NO_RESET",
+    activeInternalSquads: [DEFAULT_SQUAD_UUID],
   };
-
-  if (inboundUuids.length > 0) {
-    body.activeUserInbounds = inboundUuids.map((uuid) => ({ uuid }));
-  }
 
   const data = await rwFetch("/api/users", {
     method: "POST",
