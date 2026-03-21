@@ -59,6 +59,33 @@ export async function createRemnawaveUser(
   return data?.response ?? data;
 }
 
+export async function updateRemnawaveUserPlan(
+  uuid: string,
+  trafficLimitBytes: number,
+  validityDays: number,
+): Promise<RemnawaveUser> {
+  const expireAt = new Date();
+  expireAt.setDate(expireAt.getDate() + validityDays);
+
+  // Step 1: Reset traffic to zero — no leftover data from previous plan
+  await rwFetch(`/api/users/${uuid}/actions/reset-traffic`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+
+  // Step 2: Update limits, expiry and ensure squad is still assigned
+  const data = await rwFetch("/api/users", {
+    method: "PATCH",
+    body: JSON.stringify({
+      uuid,
+      trafficLimitBytes,
+      expireAt: expireAt.toISOString(),
+      activeInternalSquads: [DEFAULT_SQUAD_UUID],
+    }),
+  });
+  return data?.response ?? data;
+}
+
 export async function getRemnawaveUser(uuid: string): Promise<RemnawaveUser> {
   const data = await rwFetch(`/api/users/${uuid}`);
   return data?.response ?? data;

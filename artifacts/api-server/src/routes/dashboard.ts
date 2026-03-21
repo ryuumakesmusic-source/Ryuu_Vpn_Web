@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../middlewares/auth.js";
-import { getRemnawaveUser, getUserBandwidth, getSubscription, createRemnawaveUser } from "../lib/remnawave.js";
+import { getRemnawaveUser, getUserBandwidth, getSubscription, createRemnawaveUser, updateRemnawaveUserPlan } from "../lib/remnawave.js";
 import { getPlan, PLANS } from "../lib/plans.js";
 
 const router = Router();
@@ -124,13 +124,23 @@ router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
   let remnawaveShortUuid = user.remnawaveShortUuid;
 
   try {
-    const rwUser = await createRemnawaveUser(
-      user.username,
-      plan.trafficLimitBytes,
-      plan.validityDays,
-    );
-    remnawaveUuid = rwUser.uuid ?? remnawaveUuid;
-    remnawaveShortUuid = rwUser.shortUuid ?? remnawaveShortUuid;
+    if (user.remnawaveUuid) {
+      // Existing user: reset traffic to 0 and update plan limits — no data carryover
+      await updateRemnawaveUserPlan(
+        user.remnawaveUuid,
+        plan.trafficLimitBytes,
+        plan.validityDays,
+      );
+    } else {
+      // New user: create fresh Remnawave account
+      const rwUser = await createRemnawaveUser(
+        user.username,
+        plan.trafficLimitBytes,
+        plan.validityDays,
+      );
+      remnawaveUuid = rwUser.uuid ?? remnawaveUuid;
+      remnawaveShortUuid = rwUser.shortUuid ?? remnawaveShortUuid;
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(502).json({ error: `Failed to activate VPN: ${msg}` });
