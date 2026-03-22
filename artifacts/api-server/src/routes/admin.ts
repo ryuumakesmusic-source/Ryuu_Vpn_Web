@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, usersTable, topupRequestsTable } from "@workspace/db";
+import { db, usersTable, topupRequestsTable, planPurchasesTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { requireAdmin, type AdminRequest } from "../middlewares/adminAuth.js";
 import { getPlan, PLANS } from "../lib/plans.js";
@@ -196,6 +196,73 @@ router.post("/users/:id/set-balance", requireAdmin, async (req: AdminRequest, re
     .where(eq(usersTable.id, id));
 
   res.json({ success: true, balanceKs });
+});
+
+router.post("/users/:id/adjust-balance", requireAdmin, async (req: AdminRequest, res) => {
+  const { id } = req.params;
+  const { delta } = req.body as { delta: number };
+
+  if (typeof delta !== "number" || !Number.isInteger(delta) || delta === 0) {
+    res.status(400).json({ error: "delta must be a non-zero integer" });
+    return;
+  }
+
+  if (Math.abs(delta) > 10_000_000) {
+    res.status(400).json({ error: "delta too large" });
+    return;
+  }
+
+  const [user] = await db
+    .select({ balanceKs: usersTable.balanceKs })
+    .from(usersTable)
+    .where(eq(usersTable.id, id))
+    .limit(1);
+
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  const newBalance = Math.max(0, user.balanceKs + delta);
+
+  await db
+    .update(usersTable)
+    .set({ balanceKs: newBalance, updatedAt: new Date() })
+    .where(eq(usersTable.id, id));
+
+  res.json({ success: true, balanceKs: newBalance });
+});
+
+router.delete("/users/:id", requireAdmin, async (req: AdminRequest, res) => {
+  const { id } = req.params;
+
+  if (id === req.user!.userId) {
+    res.status(400).json({ error: "You cannot delete your own account" });
+    return;
+  }
+
+  const [user] = await db
+    .select({ id: usersTable.id, isAdmin: usersTable.isAdmin })
+    .from(usersTable)
+    .where(eq(usersTable.id, id))
+    .limit(1);
+
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  if (user.isAdmin) {
+    res.status(400).json({ error: "Cannot delete an admin account. Remove admin status first." });
+    return;
+  }
+
+  // Delete in dependency order
+  await db.delete(planPurchasesTable).where(eq(planPurchasesTable.userId, id));
+  await db.delete(topupRequestsTable).where(eq(topupRequestsTable.userId, id));
+  await db.delete(usersTable).where(eq(usersTable.id, id));
+
+  res.json({ success: true });
 });
 
 router.get("/plans", requireAdmin, (_req, res) => {

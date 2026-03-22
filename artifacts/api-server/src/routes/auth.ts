@@ -14,6 +14,13 @@ const loginLimiter = rateLimit({
   max: 10,
   standardHeaders: "draft-7",
   legacyHeaders: false,
+  // Key on username so each account has its own 10-attempt bucket.
+  // One user failing repeatedly cannot lock out other users.
+  keyGenerator: (req) => {
+    const body = req.body as { username?: unknown };
+    const username = typeof body?.username === "string" ? body.username.toLowerCase().slice(0, 64) : "";
+    return username || req.ip || "unknown";
+  },
   message: { error: "Too many login attempts. Please wait 15 minutes and try again." },
   skipSuccessfulRequests: true,
 });
