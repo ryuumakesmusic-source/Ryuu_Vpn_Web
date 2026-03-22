@@ -11,6 +11,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app: Express = express();
 
+// Trust the Nginx reverse proxy so req.ip reflects the real client IP,
+// not the internal Docker network IP. Without this, all users share one
+// rate-limit bucket (the Nginx container's IP).
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,

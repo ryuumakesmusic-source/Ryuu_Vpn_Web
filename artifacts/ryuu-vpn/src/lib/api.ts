@@ -153,5 +153,9 @@ export const api = {
       apiFetch(`/admin/users/${userId}/set-balance`, { method: "POST", body: JSON.stringify({ balanceKs }) }),
     setAdmin: (userId: string, isAdmin: boolean) =>
       apiFetch(`/admin/users/${userId}/set-admin`, { method: "POST", body: JSON.stringify({ isAdmin }) }),
+    adjustBalance: (userId: string, delta: number): Promise<{ success: boolean; balanceKs: number }> =>
+      apiFetch(`/admin/users/${userId}/adjust-balance`, { method: "POST", body: JSON.stringify({ delta }) }),
+    deleteUser: (userId: string): Promise<{ success: boolean }> =>
+      apiFetch(`/admin/users/${userId}`, { method: "DELETE" }),
   },
 };
