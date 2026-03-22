@@ -1,26 +1,41 @@
+import bcrypt from "bcryptjs";
 import { db, usersTable } from "@workspace/db";
-import { sql } from "drizzle-orm";
 import { logger } from "./logger.js";
 
-const ADMIN_USERS = [
-  {
-    username: "ryuu",
-    passwordHash: "$2b$10$IS8LRjQr/IKdfuL4MBrMCeTF454HGTKAzKHagKG5SY6/tqPBUHCe6",
-    isAdmin: true,
-  },
-  {
-    username: "sayuri",
-    passwordHash: "$2b$10$CrvkJJzI0rm6jBllMc.lDOExI0iWhn8MHA2WGY8D4tozw4danYP/e",
-    isAdmin: true,
-  },
-];
+const FALLBACK_HASHES: Record<string, string> = {
+  ryuu: "$2b$12$IS8LRjQr/IKdfuL4MBrMCeTF454HGTKAzKHagKG5SY6/tqPBUHCe6",
+  sayuri: "$2b$12$CrvkJJzI0rm6jBllMc.lDOExI0iWhn8MHA2WGY8D4tozw4danYP/e",
+};
 
 export async function seedAdminUsers() {
-  for (const admin of ADMIN_USERS) {
-    await db
-      .insert(usersTable)
-      .values(admin)
-      .onConflictDoNothing({ target: usersTable.username });
+  const adminSecret = process.env["ADMIN_SECRET"];
+
+  let passwordHash: string;
+
+  if (adminSecret) {
+    passwordHash = await bcrypt.hash(adminSecret, 12);
+    logger.info("Admin users seeded with ADMIN_SECRET password");
+  } else {
+    passwordHash = FALLBACK_HASHES["ryuu"]!;
+    logger.warn(
+      "ADMIN_SECRET not set — admin users seeded with dev default passwords (ryuu123 / sayuri123). Set ADMIN_SECRET in production.",
+    );
   }
-  logger.info("Admin users seeded (ryuu, sayuri)");
+
+  const admins = [
+    { username: "ryuu", passwordHash },
+    { username: "sayuri", passwordHash },
+  ];
+
+  for (const admin of admins) {
+    const existing = await db.query.usersTable.findFirst({
+      where: (u, { eq }) => eq(u.username, admin.username),
+      columns: { id: true },
+    });
+
+    if (!existing) {
+      await db.insert(usersTable).values({ ...admin, isAdmin: true });
+      logger.info({ username: admin.username }, "Admin user created");
+    }
+  }
 }

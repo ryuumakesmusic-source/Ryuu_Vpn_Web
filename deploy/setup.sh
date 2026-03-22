@@ -42,7 +42,7 @@ print_error() {
     exit 1
 }
 
-# Ask a question. Usage: ask "Prompt" VARIABLE_NAME ["default"] [secret=true]
+# Ask a required field. Usage: ask "Prompt" VARIABLE_NAME ["default"] [secret=true]
 ask() {
     local prompt="$1"
     local var_name="$2"
@@ -77,6 +77,24 @@ ask() {
     eval "$var_name='$value'"
 }
 
+# Ask an optional field (empty input is accepted). Usage: ask_optional "Prompt" VARIABLE_NAME [secret=true]
+ask_optional() {
+    local prompt="$1"
+    local var_name="$2"
+    local secret="$3"
+    local value=""
+
+    echo -ne "${YELLOW}?${NC} ${BOLD}${prompt}${NC} ${NC}[press Enter to skip]${NC}: "
+    if [ "$secret" = "true" ]; then
+        read -s value
+        echo
+    else
+        read value
+    fi
+
+    eval "$var_name='$value'"
+}
+
 generate_secret() {
     openssl rand -base64 48 | tr -d '\n/+=' | head -c 48
 }
@@ -98,14 +116,20 @@ echo -e "${YELLOW}Your secrets are never stored anywhere except the .env file on
 
 ask "Your domain (without www)" DOMAIN "ryuukakkoii.site"
 ask "GitHub repository URL (e.g. https://github.com/you/ryuu-vpn)" GITHUB_URL ""
+ask "Remnawave panel URL (e.g. https://panel.ryuukakkoii.site)" REMNAWAVE_URL "https://panel.ryuukakkoii.site"
 ask "Remnawave API key" REMNAWAVE_API_KEY "" true
-ask "Telegram bot token" TELEGRAM_BOT_TOKEN "" true
+ask "Admin password (used for ryuu + sayuri accounts)" ADMIN_SECRET "" true
+ask "Notification bot token (for payment alerts to admins)" TELEGRAM_BOT_TOKEN "" true
 ask "Telegram admin chat IDs (comma-separated, e.g. 123456,789012)" TELEGRAM_ADMIN_CHAT_IDS ""
-ask "Admin secret (password for ryuu/sawpyaesone accounts)" ADMIN_SECRET "" true
+echo ""
+echo -e "${YELLOW}--- Mini App Bot (optional, press Enter to skip) ---${NC}"
+echo -e "${YELLOW}This is the bot users open from Telegram to access the shop.${NC}"
+ask_optional "Mini App bot token (from @BotFather)" MINI_BOT_TOKEN true
 
 # Auto-generate secrets
 SESSION_SECRET=$(generate_secret)
 DB_PASSWORD=$(generate_secret)
+BOT_WEBHOOK_SECRET=$(generate_secret)
 
 echo -e "\n${GREEN}Got everything. Starting setup — this takes about 3–5 minutes.${NC}\n"
 
@@ -168,11 +192,15 @@ LOG_LEVEL=info
 SESSION_SECRET=${SESSION_SECRET}
 ADMIN_SECRET=${ADMIN_SECRET}
 
-REMNAWAVE_URL=https://panel.ryuukakkoii.site
+REMNAWAVE_URL=${REMNAWAVE_URL}
 REMNAWAVE_API_KEY=${REMNAWAVE_API_KEY}
 
 TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
 TELEGRAM_ADMIN_CHAT_IDS=${TELEGRAM_ADMIN_CHAT_IDS}
+
+MINI_BOT_TOKEN=${MINI_BOT_TOKEN}
+MINI_APP_URL=https://${DOMAIN}
+BOT_WEBHOOK_SECRET=${BOT_WEBHOOK_SECRET}
 
 # Used by docker-compose for the DB container
 DB_PASSWORD=${DB_PASSWORD}
@@ -234,6 +262,22 @@ until curl -sf "http://localhost:8080/api/dashboard/plans" > /dev/null 2>&1; do
 done
 print_success "App is responding"
 
+# ── Register Telegram Mini App Bot Webhook ────────────────────────────────────
+# The server registers it automatically on startup via MINI_APP_URL + MINI_BOT_TOKEN.
+# We just wait a moment for the app to have registered, then confirm.
+if [ -n "$MINI_BOT_TOKEN" ]; then
+    print_step "Telegram Mini App Bot Webhook"
+    sleep 5
+    WEBHOOK_STATUS=$(curl -sf "https://api.telegram.org/bot${MINI_BOT_TOKEN}/getWebhookInfo" 2>/dev/null || echo '{}')
+    WEBHOOK_URL=$(echo "$WEBHOOK_STATUS" | grep -o '"url":"[^"]*"' | cut -d'"' -f4 || echo "")
+    if [ -n "$WEBHOOK_URL" ] && [ "$WEBHOOK_URL" != "" ]; then
+        print_success "Webhook registered: $WEBHOOK_URL"
+    else
+        print_warning "Webhook not yet visible — the server registers it on startup. Check logs:"
+        echo "    docker compose logs app | grep webhook"
+    fi
+fi
+
 # ── Auto-renewal for SSL ──────────────────────────────────────────────────────
 print_step "SSL Auto-renewal"
 CRON_CMD="0 3 * * * certbot renew --quiet && docker compose -f $APP_DIR/docker-compose.yml exec -T nginx nginx -s reload"
@@ -252,13 +296,43 @@ echo -e "  ${YELLOW}Run manually anytime:${NC}  bash $APP_DIR/backup.sh"
 # ── Create update helper script ───────────────────────────────────────────────
 cat > "$APP_DIR/update.sh" <<'UPDATEEOF'
 #!/bin/bash
-echo "Pulling latest code..."
-cd /opt/ryuu-vpn
+# RYUU VPN — One-command update script
+# Usage: bash /opt/ryuu-vpn/update.sh
+set -e
+
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+BOLD='\033[1m'
+
+APP_DIR="/opt/ryuu-vpn"
+cd "$APP_DIR"
+
+echo -e "\n${BLUE}${BOLD}▶ Pulling latest code...${NC}"
 git pull
-echo "Rebuilding and restarting..."
+
+echo -e "\n${BLUE}${BOLD}▶ Rebuilding and restarting containers...${NC}"
 docker compose up -d --build
-echo "Done. Logs:"
-docker compose logs --tail=20 app
+
+echo -e "\n${BLUE}${BOLD}▶ Waiting for app to start...${NC}"
+ATTEMPTS=0
+until curl -sf "http://localhost:8080/api/dashboard/plans" > /dev/null 2>&1; do
+    ATTEMPTS=$((ATTEMPTS + 1))
+    if [ "$ATTEMPTS" -ge 30 ]; then
+        echo -e "  ${YELLOW}⚠ App taking longer than expected. Check:${NC}"
+        echo "    docker compose logs app"
+        break
+    fi
+    sleep 3
+done
+
+echo -e "\n${GREEN}✓ Update complete!${NC}"
+echo -e "  DB migrations + admin seeding run automatically on startup."
+echo -e "  Mini App bot webhook is registered automatically if MINI_BOT_TOKEN is set."
+echo ""
+echo -e "  ${BLUE}Recent logs:${NC}"
+docker compose logs --tail=15 app
 UPDATEEOF
 chmod +x "$APP_DIR/update.sh"
 
@@ -269,11 +343,19 @@ echo "╔═══════════════════════�
 echo "║          Setup Complete!                     ║"
 echo "╚══════════════════════════════════════════════╝"
 echo -e "${NC}"
-echo -e "  ${BLUE}${BOLD}Website:${NC}   https://$DOMAIN"
-echo -e "  ${BLUE}${BOLD}App dir:${NC}   $APP_DIR"
-echo -e "  ${BLUE}${BOLD}Logs:${NC}      docker compose -f $APP_DIR/docker-compose.yml logs -f app"
-echo -e "  ${BLUE}${BOLD}Update:${NC}    bash $APP_DIR/update.sh"
+echo -e "  ${BLUE}${BOLD}Website:${NC}     https://$DOMAIN"
+echo -e "  ${BLUE}${BOLD}App dir:${NC}     $APP_DIR"
+echo -e "  ${BLUE}${BOLD}Logs:${NC}        docker compose logs -f app"
+echo -e "  ${BLUE}${BOLD}Update:${NC}      bash $APP_DIR/update.sh"
+echo -e "  ${BLUE}${BOLD}Backup:${NC}      bash $APP_DIR/backup.sh"
 echo ""
-echo -e "${YELLOW}Telegram Mini App: Open @BotFather → your bot → Bot Settings → Menu Button${NC}"
-echo -e "${YELLOW}Set the URL to: https://$DOMAIN${NC}"
+echo -e "${YELLOW}Admin accounts:${NC}"
+echo -e "  Username: ryuu     Password: (your ADMIN_SECRET)"
+echo -e "  Username: sayuri   Password: (your ADMIN_SECRET)"
 echo ""
+if [ -n "$MINI_BOT_TOKEN" ]; then
+    echo -e "${YELLOW}Mini App Bot:${NC}"
+    echo -e "  Webhook auto-registered to: https://$DOMAIN/api/bot/webhook"
+    echo -e "  In @BotFather → your bot → Menu Button → Set URL → https://$DOMAIN"
+    echo ""
+fi
