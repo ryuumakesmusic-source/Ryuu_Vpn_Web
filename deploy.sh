@@ -23,13 +23,6 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Check if docker-compose is installed
-if ! command -v docker-compose &> /dev/null; then
-    echo "❌ Error: docker-compose is not installed!"
-    echo "Install docker-compose first"
-    exit 1
-fi
-
 echo "✅ Prerequisites check passed"
 echo ""
 
@@ -40,12 +33,12 @@ echo ""
 
 # Stop existing containers
 echo "🛑 Stopping existing containers..."
-docker-compose down
+docker compose down
 echo ""
 
 # Build and start containers
 echo "🔨 Building and starting containers..."
-docker-compose up -d --build
+docker compose up -d --build
 echo ""
 
 # Wait for services to be healthy
@@ -58,7 +51,7 @@ if docker ps | grep -q "ryuu-vpn-app"; then
     echo "✅ Deployment successful!"
     echo ""
     echo "📊 Container Status:"
-    docker-compose ps
+    docker compose ps
     echo ""
     echo "📝 View logs:"
     echo "  docker logs -f ryuu-vpn-app"
@@ -69,6 +62,6 @@ else
     echo "❌ Deployment failed!"
     echo ""
     echo "Check logs:"
-    echo "  docker-compose logs"
+    echo "  docker compose logs"
     exit 1
 fi

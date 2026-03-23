@@ -141,14 +141,20 @@ export const api = {
   myTopups: (): Promise<TopupRequest[]> => apiFetch("/topup/my"),
 
   admin: {
-    topups: (): Promise<AdminTopup[]> => apiFetch("/admin/topups"),
+    topups: async (): Promise<AdminTopup[]> => {
+      const response = await apiFetch("/admin/topups");
+      return response.data || response;
+    },
     topupScreenshot: (id: string): Promise<{ screenshotUrl: string }> =>
       apiFetch(`/admin/topups/${id}/screenshot`),
     approveTopup: (id: string, adminNote?: string) =>
       apiFetch(`/admin/topups/${id}/approve`, { method: "POST", body: JSON.stringify({ adminNote }) }),
     rejectTopup: (id: string, adminNote?: string) =>
       apiFetch(`/admin/topups/${id}/reject`, { method: "POST", body: JSON.stringify({ adminNote }) }),
-    users: (): Promise<AdminUser[]> => apiFetch("/admin/users"),
+    users: async (): Promise<AdminUser[]> => {
+      const response = await apiFetch("/admin/users");
+      return response.data || response;
+    },
     setBalance: (userId: string, balanceKs: number) =>
       apiFetch(`/admin/users/${userId}/set-balance`, { method: "POST", body: JSON.stringify({ balanceKs }) }),
     setAdmin: (userId: string, isAdmin: boolean) =>
