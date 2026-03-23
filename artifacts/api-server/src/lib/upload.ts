@@ -2,7 +2,7 @@ import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { randomUUID } from "crypto";
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "/var/www/ryuu-vpn/uploads/screenshots";
+const UPLOAD_DIR = process.env.UPLOAD_DIR || "/app/uploads/screenshots";
 const PUBLIC_URL = process.env.PUBLIC_URL || "https://ryuukakkoii.site";
 
 export async function saveScreenshot(buffer: Buffer, mimeType: string): Promise<string> {
