@@ -33,6 +33,9 @@ RUN BASE_PATH=/ pnpm --filter @workspace/ryuu-vpn run build
 # Build API server (esbuild bundles all deps into dist/)
 RUN pnpm --filter @workspace/api-server run build
 
+# Build scripts (compile TypeScript to JavaScript)
+RUN pnpm --filter @workspace/scripts run build
+
 # ─── Stage 2: Production image ────────────────────────────────────────────────
 # Alpine is fine here — the runner only executes the pre-bundled .mjs file,
 # no native platform binaries are needed at runtime.
@@ -42,6 +45,7 @@ WORKDIR /app
 # Only copy the built artifacts — no node_modules needed (esbuild bundled everything)
 COPY --from=builder /app/artifacts/api-server/dist ./artifacts/api-server/dist
 COPY --from=builder /app/artifacts/ryuu-vpn/dist/public ./artifacts/ryuu-vpn/dist/public
+COPY --from=builder /app/scripts/dist ./scripts/dist
 
 ENV NODE_ENV=production
 ENV PORT=8080

@@ -5,8 +5,8 @@ const CRON_JOBS = [
   {
     name: "check-expiring-plans",
     schedule: "0 9 * * *", // Daily at 9 AM Myanmar Time (UTC+6:30 = 2:30 AM UTC)
-    command: "pnpm",
-    args: ["--filter", "@workspace/scripts", "run", "check-expiring-plans"],
+    command: "node",
+    args: ["scripts/dist/check-expiring-plans.js"],
   },
 ];
 
