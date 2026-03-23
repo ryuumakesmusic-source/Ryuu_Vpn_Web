@@ -3,7 +3,7 @@ import { db, usersTable, topupRequestsTable, planPurchasesTable } from "@workspa
 import { eq, desc } from "drizzle-orm";
 import { requireAdmin, type AdminRequest } from "../middlewares/adminAuth.js";
 import { getPlan, PLANS } from "../lib/plans.js";
-import { sendTelegramMessage } from "../lib/telegram.js";
+import { sendTelegramMessage, notifyUser } from "../lib/telegram.js";
 
 const router = Router();
 
@@ -82,7 +82,7 @@ router.post("/topups/:id/approve", requireAdmin, async (req: AdminRequest, res) 
     .where(eq(topupRequestsTable.id, id));
 
   const [user] = await db
-    .select({ balanceKs: usersTable.balanceKs, username: usersTable.username })
+    .select({ balanceKs: usersTable.balanceKs, username: usersTable.username, telegramId: usersTable.telegramId })
     .from(usersTable)
     .where(eq(usersTable.id, topup.userId))
     .limit(1);
@@ -108,6 +108,22 @@ router.post("/topups/:id/approve", requireAdmin, async (req: AdminRequest, res) 
   sendTelegramMessage(notifyText).catch((err) => {
     req.log.warn({ err }, "Failed to send Telegram notification for top-up approval");
   });
+
+  // Notify user
+  if (user?.telegramId) {
+    const userMessage = [
+      `✅ <b>Top-Up Approved!</b>`,
+      ``,
+      `💵 Amount: <b>${topup.amountKs.toLocaleString()} Ks</b>`,
+      `💰 New Balance: <b>${newBalance.toLocaleString()} Ks</b>`,
+      ...(adminNote?.trim() ? [`📝 Note: ${adminNote.trim()}`] : []),
+      ``,
+      `🎉 Your balance has been credited!`,
+    ].join("\n");
+    notifyUser(user.telegramId, userMessage).catch((err) => {
+      req.log.warn({ err }, "Failed to send user notification for top-up approval");
+    });
+  }
 
   res.json({ success: true, newBalance });
 });
@@ -137,7 +153,7 @@ router.post("/topups/:id/reject", requireAdmin, async (req: AdminRequest, res) =
     .where(eq(topupRequestsTable.id, id));
 
   const [user] = await db
-    .select({ username: usersTable.username })
+    .select({ username: usersTable.username, telegramId: usersTable.telegramId })
     .from(usersTable)
     .where(eq(usersTable.id, topup.userId))
     .limit(1);
@@ -155,6 +171,22 @@ router.post("/topups/:id/reject", requireAdmin, async (req: AdminRequest, res) =
   sendTelegramMessage(notifyText).catch((err) => {
     req.log.warn({ err }, "Failed to send Telegram notification for top-up rejection");
   });
+
+  // Notify user
+  if (user?.telegramId) {
+    const userMessage = [
+      `❌ <b>Top-Up Rejected</b>`,
+      ``,
+      `💵 Amount: <b>${topup.amountKs.toLocaleString()} Ks</b>`,
+      `🏦 Method: <b>${topup.paymentMethod}</b>`,
+      ...(adminNote?.trim() ? [`📝 Reason: ${adminNote.trim()}`] : []),
+      ``,
+      `Please contact support if you have questions.`,
+    ].join("\n");
+    notifyUser(user.telegramId, userMessage).catch((err) => {
+      req.log.warn({ err }, "Failed to send user notification for top-up rejection");
+    });
+  }
 
   res.json({ success: true });
 });

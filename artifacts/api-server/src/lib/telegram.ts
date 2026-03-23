@@ -69,6 +69,29 @@ export async function sendMiniAppBotMessage(
   }
 }
 
+export async function notifyUser(
+  telegramId: string | number,
+  message: string,
+): Promise<void> {
+  if (!MINI_BOT_TOKEN) {
+    logger.warn("MINI_BOT_TOKEN not set - cannot send user notification");
+    return;
+  }
+  try {
+    await fetch(`https://api.telegram.org/bot${MINI_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: telegramId,
+        text: message,
+        parse_mode: "HTML",
+      }),
+    });
+  } catch (err) {
+    logger.warn({ err, telegramId }, "Failed to send user notification");
+  }
+}
+
 export async function registerMiniAppWebhook(): Promise<void> {
   if (!MINI_BOT_TOKEN) {
     logger.info("MINI_BOT_TOKEN not set — skipping Mini App bot webhook registration");
