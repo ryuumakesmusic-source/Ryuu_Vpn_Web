@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { sendMiniAppBotMessage } from "../lib/telegram.js";
+import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -49,6 +51,51 @@ router.post("/webhook", async (req, res) => {
   const chatId = message.chat.id;
   const text = message.text ?? "";
   const firstName = message.from?.first_name ?? "there";
+
+  // /link <username> — links Telegram account to app account
+  if (text.startsWith("/link")) {
+    const parts = text.trim().split(/\s+/);
+    const username = parts[1]?.toLowerCase();
+
+    if (!username) {
+      await sendMiniAppBotMessage(chatId, [
+        `🔗 <b>Link Your Account</b>`,
+        ``,
+        `Send your app username to link:`,
+        `<code>/link your_username</code>`,
+        ``,
+        `Example: <code>/link ryuu</code>`,
+      ].join("\n"));
+      res.sendStatus(200);
+      return;
+    }
+
+    const [user] = await db
+      .select({ id: usersTable.id, username: usersTable.username, telegramId: usersTable.telegramId })
+      .from(usersTable)
+      .where(eq(usersTable.username, username))
+      .limit(1);
+
+    if (!user) {
+      await sendMiniAppBotMessage(chatId, `❌ Username <b>${username}</b> not found. Check the spelling and try again.`);
+      res.sendStatus(200);
+      return;
+    }
+
+    await db
+      .update(usersTable)
+      .set({ telegramId: String(chatId) })
+      .where(eq(usersTable.id, user.id));
+
+    await sendMiniAppBotMessage(chatId, [
+      `✅ <b>Account Linked!</b>`,
+      ``,
+      `Your Telegram is now linked to: <b>${user.username}</b>`,
+      `You'll receive notifications for top-up approvals and rejections.`,
+    ].join("\n"));
+    res.sendStatus(200);
+    return;
+  }
 
   if (text === "/start" || text.startsWith("/start ")) {
     const welcomeText = [
