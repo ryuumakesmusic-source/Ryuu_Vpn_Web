@@ -82,7 +82,7 @@ router.post("/topups/:id/approve", requireAdmin, async (req: AdminRequest, res) 
     .where(eq(topupRequestsTable.id, id));
 
   const [user] = await db
-    .select({ balanceKs: usersTable.balanceKs, username: usersTable.username, telegramId: usersTable.telegramId })
+    .select({ balanceKs: usersTable.balanceKs, username: usersTable.username })
     .from(usersTable)
     .where(eq(usersTable.id, topup.userId))
     .limit(1);
@@ -109,21 +109,7 @@ router.post("/topups/:id/approve", requireAdmin, async (req: AdminRequest, res) 
     req.log.warn({ err }, "Failed to send Telegram notification for top-up approval");
   });
 
-  // Notify user
-  if (user?.telegramId) {
-    const userMessage = [
-      `✅ <b>Top-Up Approved!</b>`,
-      ``,
-      `💵 Amount: <b>${topup.amountKs.toLocaleString()} Ks</b>`,
-      `💰 New Balance: <b>${newBalance.toLocaleString()} Ks</b>`,
-      ...(adminNote?.trim() ? [`📝 Note: ${adminNote.trim()}`] : []),
-      ``,
-      `🎉 Your balance has been credited!`,
-    ].join("\n");
-    notifyUser(user.telegramId, userMessage).catch((err) => {
-      req.log.warn({ err }, "Failed to send user notification for top-up approval");
-    });
-  }
+  // TODO: Notify user via Telegram when telegramId column is added to database
 
   res.json({ success: true, newBalance });
 });
@@ -153,7 +139,7 @@ router.post("/topups/:id/reject", requireAdmin, async (req: AdminRequest, res) =
     .where(eq(topupRequestsTable.id, id));
 
   const [user] = await db
-    .select({ username: usersTable.username, telegramId: usersTable.telegramId })
+    .select({ username: usersTable.username })
     .from(usersTable)
     .where(eq(usersTable.id, topup.userId))
     .limit(1);
@@ -172,21 +158,7 @@ router.post("/topups/:id/reject", requireAdmin, async (req: AdminRequest, res) =
     req.log.warn({ err }, "Failed to send Telegram notification for top-up rejection");
   });
 
-  // Notify user
-  if (user?.telegramId) {
-    const userMessage = [
-      `❌ <b>Top-Up Rejected</b>`,
-      ``,
-      `💵 Amount: <b>${topup.amountKs.toLocaleString()} Ks</b>`,
-      `🏦 Method: <b>${topup.paymentMethod}</b>`,
-      ...(adminNote?.trim() ? [`📝 Reason: ${adminNote.trim()}`] : []),
-      ``,
-      `Please contact support if you have questions.`,
-    ].join("\n");
-    notifyUser(user.telegramId, userMessage).catch((err) => {
-      req.log.warn({ err }, "Failed to send user notification for top-up rejection");
-    });
-  }
+  // TODO: Notify user via Telegram when telegramId column is added to database
 
   res.json({ success: true });
 });
