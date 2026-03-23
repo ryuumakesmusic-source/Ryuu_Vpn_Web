@@ -34,9 +34,10 @@ const registerLimiter = rateLimit({
 });
 
 router.post("/register", registerLimiter, async (req, res) => {
-  const { username, password } = req.body as {
+  const { username, password, telegramId } = req.body as {
     username: string;
     password: string;
+    telegramId?: string;
   };
 
   if (!username || !password) {
@@ -76,7 +77,7 @@ router.post("/register", registerLimiter, async (req, res) => {
 
   const [user] = await db
     .insert(usersTable)
-    .values({ username, passwordHash })
+    .values({ username, passwordHash, ...(telegramId ? { telegramId: String(telegramId) } : {}) })
     .returning();
 
   const token = signToken({ userId: user.id, username: user.username });
@@ -95,7 +96,7 @@ router.post("/register", registerLimiter, async (req, res) => {
 });
 
 router.post("/login", loginLimiter, async (req, res) => {
-  const { username, password } = req.body as { username: string; password: string };
+  const { username, password, telegramId } = req.body as { username: string; password: string; telegramId?: string };
 
   if (!username || !password) {
     res.status(400).json({ error: "username and password are required" });
@@ -123,6 +124,14 @@ router.post("/login", loginLimiter, async (req, res) => {
   if (!valid) {
     res.status(401).json({ error: "Invalid username or password" });
     return;
+  }
+
+  // Save or update telegramId if provided
+  if (telegramId && String(telegramId) !== user.telegramId) {
+    await db
+      .update(usersTable)
+      .set({ telegramId: String(telegramId) })
+      .where(eq(usersTable.id, user.id));
   }
 
   const token = signToken({ userId: user.id, username: user.username });

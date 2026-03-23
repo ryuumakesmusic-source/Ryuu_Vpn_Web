@@ -32,15 +32,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, [token]);
 
+  const getTelegramId = (): string | undefined => {
+    try {
+      const tg = (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id;
+      return tg ? String(tg) : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
   const login = async (username: string, password: string) => {
-    const res = await api.login(username, password);
+    const res = await api.login(username, password, getTelegramId());
     localStorage.setItem("ryuu_token", res.token);
     setToken(res.token);
     setUser(res.user);
   };
 
   const register = async (username: string, password: string) => {
-    const res = await api.register(username, password);
+    const res = await api.register(username, password, getTelegramId());
     localStorage.setItem("ryuu_token", res.token);
     setToken(res.token);
     setUser(res.user);

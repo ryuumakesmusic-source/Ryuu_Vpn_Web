@@ -99,11 +99,11 @@ export interface AdminUser {
 }
 
 export const api = {
-  register: (username: string, password: string): Promise<{ token: string; user: AuthUser }> =>
-    apiFetch("/auth/register", { method: "POST", body: JSON.stringify({ username, password }) }),
+  register: (username: string, password: string, telegramId?: string): Promise<{ token: string; user: AuthUser }> =>
+    apiFetch("/auth/register", { method: "POST", body: JSON.stringify({ username, password, ...(telegramId ? { telegramId } : {}) }) }),
 
-  login: (username: string, password: string): Promise<{ token: string; user: AuthUser }> =>
-    apiFetch("/auth/login", { method: "POST", body: JSON.stringify({ username, password }) }),
+  login: (username: string, password: string, telegramId?: string): Promise<{ token: string; user: AuthUser }> =>
+    apiFetch("/auth/login", { method: "POST", body: JSON.stringify({ username, password, ...(telegramId ? { telegramId } : {}) }) }),
 
   me: (): Promise<AuthUser> => apiFetch("/auth/me"),
 
