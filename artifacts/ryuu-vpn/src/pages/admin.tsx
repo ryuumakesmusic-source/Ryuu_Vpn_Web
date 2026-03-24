@@ -275,7 +275,7 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {loading ? (
+        {loading && tab !== "announcements" ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
@@ -506,9 +506,14 @@ export default function AdminPage() {
             ))}
           </div>
         ) : tab === "announcements" ? (
-          <div className="space-y-6">
-            {/* Create Announcement Form */}
-            <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
+          loading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Create Announcement Form */}
+              <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
               <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                 <Megaphone className="w-5 h-5 text-amber-400" />
                 Create New Announcement
@@ -644,6 +649,7 @@ export default function AdminPage() {
               )}
             </div>
           </div>
+          )
         ) : null}
       </div>
     </div>
