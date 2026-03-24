@@ -1,10 +1,7 @@
 import { Router } from "express";
-import rateLimit from "express-rate-limit";
 import { db, usersTable, planPurchasesTable, pool } from "@workspace/db";
 import { eq, and, gte, count, sql } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../middlewares/auth.js";
-import { businessLogger } from "../lib/businessLogger.js";
-import { cacheMiddleware } from "../lib/cache.js";
 import {
   getRemnawaveUser,
   getUserBandwidth,
@@ -16,18 +13,8 @@ import { getPlan, PLANS } from "../lib/plans.js";
 
 const router = Router();
 
-const MONTHLY_PURCHASE_LIMIT = 2;
+const MONTHLY_PURCHASE_LIMIT = 3;
 const PREMIUM_PLAN_IDS = ["premium", "ultra"];
-
-// Rate limiter for plan purchases - max 5 attempts per 15 minutes
-const purchaseLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  standardHeaders: "draft-7",
-  legacyHeaders: false,
-  message: { error: "Too many purchase attempts. Please wait 15 minutes and try again." },
-  skipSuccessfulRequests: false,
-});
 
 router.get("/stats", requireAuth, async (req: AuthRequest, res) => {
   const [user] = await db
@@ -75,6 +62,8 @@ router.get("/stats", requireAuth, async (req: AuthRequest, res) => {
   const limitBytes: number = vpnUser?.trafficLimitBytes ?? plan?.trafficLimitBytes ?? 0;
   const remainingBytes = Math.max(0, limitBytes - usedBytes);
 
+  console.log(`[Dashboard Stats] User: ${user.username}, Balance from DB: ${user.balanceKs}`);
+  
   res.json({
     username: user.username,
     planId: user.planId,
@@ -112,8 +101,7 @@ router.get("/subscription", requireAuth, async (req: AuthRequest, res) => {
   });
 });
 
-// Cache plans for 5 minutes (they rarely change)
-router.get("/plans", cacheMiddleware("plans", 300), (_req, res) => {
+router.get("/plans", (_req, res) => {
   res.json(Object.values(PLANS));
 });
 
@@ -146,7 +134,7 @@ router.get("/purchase-status", requireAuth, async (req: AuthRequest, res) => {
   });
 });
 
-router.post("/buy-plan", requireAuth, purchaseLimiter, async (req: AuthRequest, res) => {
+router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
   const { planId } = req.body as { planId: string };
 
   const plan = getPlan(planId);
@@ -233,16 +221,6 @@ router.post("/buy-plan", requireAuth, purchaseLimiter, async (req: AuthRequest, 
     } catch (err) {
       await client.query("ROLLBACK");
       const msg = err instanceof Error ? err.message : String(err);
-      
-      // Log VPN provisioning error
-      businessLogger.businessError({
-        event: "vpn_provisioning_failed",
-        userId: user.id,
-        username: user.username,
-        error: err instanceof Error ? err : new Error(msg),
-        context: { planId, remnawaveUuid: user.remnawave_uuid },
-      });
-      
       res.status(502).json({ error: `Failed to activate VPN: ${msg}` });
       return;
     }
@@ -261,32 +239,6 @@ router.post("/buy-plan", requireAuth, purchaseLimiter, async (req: AuthRequest, 
     );
 
     await client.query("COMMIT");
-
-    // Log successful purchase
-    businessLogger.planPurchased({
-      userId: user.id,
-      username: user.username,
-      planId,
-      priceKs: plan.priceKs,
-      newBalance,
-    });
-
-    // Log VPN provisioning
-    if (user.remnawave_uuid) {
-      businessLogger.vpnPlanRenewed({
-        userId: user.id,
-        username: user.username,
-        remnawaveUuid: user.remnawave_uuid,
-        planId,
-      });
-    } else {
-      businessLogger.vpnUserCreated({
-        userId: user.id,
-        username: user.username,
-        remnawaveUuid: remnawaveUuid!,
-        planId,
-      });
-    }
 
     const purchasesAfter = purchasesThisMonth + 1;
 

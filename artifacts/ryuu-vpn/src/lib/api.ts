@@ -163,5 +163,7 @@ export const api = {
       apiFetch(`/admin/users/${userId}/adjust-balance`, { method: "POST", body: JSON.stringify({ delta }) }),
     deleteUser: (userId: string): Promise<{ success: boolean }> =>
       apiFetch(`/admin/users/${userId}`, { method: "DELETE" }),
+    cancelPackage: (userId: string): Promise<{ success: boolean; daysRemaining: number; refundKs: number; newBalance: number }> =>
+      apiFetch(`/admin/users/${userId}/package`, { method: "DELETE" }),
   },
 };

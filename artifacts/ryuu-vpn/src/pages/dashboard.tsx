@@ -3,11 +3,12 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { api, type DashboardStats, type SubscriptionInfo, type Plan, type PurchaseStatus, type TopupRequest } from "@/lib/api";
-import { LogOut, Copy, Check, Wifi, Shield, Clock, Database, Wallet, ShoppingCart, ArrowUpRight, Gift, X, User, History, ChevronDown, ChevronUp, RefreshCw, TrendingUp, Zap, Calendar, Star, Award, CheckCircle2, AlertTriangle } from "lucide-react";
+import { LogOut, Copy, Check, Wifi, Shield, Clock, Database, Wallet, ShoppingCart, ArrowUpRight, Gift, X, User, History, ChevronDown, ChevronUp, RefreshCw, TrendingUp, Zap, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { CircularProgress } from "@/components/ui/CircularProgress";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
+import { QuickActionsHub } from "@/components/dashboard/QuickActionsHub";
 import { EnhancedBalanceCard } from "@/components/dashboard/EnhancedBalanceCard";
 
 function StatusBadge({ status }: { status: string }) {
@@ -252,8 +253,12 @@ export default function DashboardPage() {
           <EnhancedBalanceCard
             balance={stats?.balanceKs ?? 0}
             onTopUp={() => navigate("/topup")}
+            onViewHistory={() => setTopupsOpen(!topupsOpen)}
           />
         </div>
+
+        {/* Quick Actions Hub */}
+        <QuickActionsHub />
 
         {pendingTopup && (
           <motion.div initial={{ y: -10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-5 flex items-center gap-3 p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
@@ -308,17 +313,6 @@ export default function DashboardPage() {
                           <AnimatedCounter value={stats?.remainingGb ?? 0} decimals={1} className="text-primary font-bold" />
                           <span className="text-white/40">GB remaining</span>
                         </div>
-                        {/* Data usage warning at 80% */}
-                        {stats?.limitGb && (stats.usedGb / stats.limitGb) >= 0.8 && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold mt-3"
-                          >
-                            <AlertTriangle className="w-3 h-3" />
-                            {(stats.usedGb / stats.limitGb) >= 0.95 ? "Almost out of data!" : "Running low on data"}
-                          </motion.div>
-                        )}
                       </div>
                     </div>
                   )}
@@ -463,115 +457,43 @@ export default function DashboardPage() {
                   You've used all {purchaseStatus.monthlyLimit} plan purchases for this month. Your limit resets on the 1st of next month.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {plans.map((plan) => {
                     const canAfford = (stats?.balanceKs ?? user?.balanceKs ?? 0) >= plan.priceKs;
                     const blocked = !purchaseStatus?.canBuyStarter && plan.id === "starter";
                     const disabled = !canAfford || blocked || buyingPlan !== null;
-                    const hasBadge = plan.badge === "most_popular" || plan.badge === "best_value";
-                    
                     return (
-                      <motion.div
-                        key={plan.id}
-                        initial={{ y: 20, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        transition={{ delay: 0.1 * plans.indexOf(plan) }}
-                        whileHover={{ y: -4, scale: 1.02 }}
-                        className={`relative border rounded-2xl p-6 transition-all ${
-                          hasBadge
-                            ? "border-primary/50 bg-gradient-to-br from-primary/10 via-purple-500/5 to-transparent shadow-lg shadow-primary/20"
-                            : "border-white/10 bg-white/[0.02] hover:border-white/20"
-                        }`}
-                      >
-                        {/* Glow effect for featured plans */}
-                        {hasBadge && (
-                          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-cyan-500/10 rounded-2xl opacity-50" />
+                      <div key={plan.id}
+                        className={`border rounded-2xl p-5 transition-all ${
+                          plan.id === "premium"
+                            ? "border-primary/40 bg-primary/5"
+                            : "border-white/10 bg-white/[0.02]"
+                        }`}>
+                        {plan.id === "premium" && (
+                          <div className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2">Most Popular</div>
                         )}
-                        
-                        <div className="relative z-10">
-                          {/* Badge */}
-                          {plan.badge === "most_popular" && (
-                            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-primary mb-3">
-                              <Star className="w-3.5 h-3.5 fill-primary" />
-                              Most Popular
-                            </div>
-                          )}
-                          {plan.badge === "best_value" && (
-                            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-cyan-400 mb-3">
-                              <Award className="w-3.5 h-3.5 fill-cyan-400" />
-                              Best Value
-                            </div>
-                          )}
-                          
-                          {/* Plan Name */}
-                          <h3 className="font-display font-bold text-white text-base tracking-widest mb-2">{plan.name}</h3>
-                          
-                          {/* Data & Validity */}
-                          <div className="flex items-baseline gap-2 mb-1">
-                            <span className="text-3xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-primary">
-                              {plan.dataGb}
-                            </span>
-                            <span className="text-white/50 text-sm font-medium">GB</span>
-                          </div>
-                          <div className="text-xs text-white/40 mb-4">{plan.validityDays} days validity</div>
-                          
-                          {/* Features List */}
-                          <div className="space-y-2 mb-5 pb-5 border-b border-white/10">
-                            {plan.features.slice(0, 4).map((feature, idx) => (
-                              <div key={idx} className="flex items-start gap-2 text-xs text-white/70">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
-                                <span>{feature}</span>
-                              </div>
-                            ))}
-                          </div>
-                          
-                          {/* Price & Value */}
-                          <div className="mb-4">
-                            <div className="flex items-baseline gap-2 mb-1">
-                              <span className="text-2xl font-bold text-primary">
-                                {plan.priceKs.toLocaleString()}
-                              </span>
-                              <span className="text-white/40 text-sm">Ks</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-white/30">
-                                {plan.pricePerGb} Ks/GB
-                              </span>
-                              {plan.savingsPercent && (
-                                <span className="text-[10px] font-bold text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded">
-                                  Save {plan.savingsPercent}%
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Buy Button */}
-                          <motion.button
-                            onClick={() => handleBuyPlan(plan.id)}
-                            disabled={disabled}
-                            whileHover={!disabled ? { scale: 1.02 } : {}}
-                            whileTap={!disabled ? { scale: 0.98 } : {}}
-                            className={`w-full py-3 rounded-xl text-sm font-bold uppercase tracking-wider transition-all ${
-                              !disabled
-                                ? "bg-gradient-to-r from-primary to-purple-600 text-white hover:shadow-lg hover:shadow-primary/50"
-                                : "bg-white/5 text-white/30 cursor-not-allowed border border-white/10"
-                            }`}
-                          >
-                            {buyingPlan === plan.id ? (
-                              <span className="flex items-center justify-center gap-2">
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                Activating...
-                              </span>
-                            ) : blocked ? "Plan Locked"
-                              : !canAfford ? "Insufficient Balance"
-                              : "Buy Now"}
-                          </motion.button>
-                          
-                          {blocked && (
-                            <p className="text-[10px] text-white/25 mt-2 text-center">Current plan is Premium or Ultra</p>
-                          )}
-                        </div>
-                      </motion.div>
+                        <h3 className="font-display font-bold text-white text-sm tracking-widest mb-1">{plan.name}</h3>
+                        <div className="text-2xl font-display font-bold text-white mb-1">{plan.dataGb} GB</div>
+                        <div className="text-xs text-white/40 mb-3">{plan.validityDays} days</div>
+                        <div className="text-lg font-bold text-primary mb-4">{plan.priceKs.toLocaleString()} Ks</div>
+                        <button
+                          onClick={() => handleBuyPlan(plan.id)}
+                          disabled={disabled}
+                          className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+                            !disabled
+                              ? "bg-primary text-white hover:shadow-[0_0_20px_-5px_rgba(168,85,247,0.6)] hover:-translate-y-0.5"
+                              : "bg-white/5 text-white/30 cursor-not-allowed"
+                          } disabled:opacity-60 disabled:translate-y-0`}
+                        >
+                          {buyingPlan === plan.id ? "Activating..."
+                            : blocked ? "Plan locked"
+                            : !canAfford ? "Insufficient Balance"
+                            : "Buy Now"}
+                        </button>
+                        {blocked && (
+                          <p className="text-[10px] text-white/25 mt-1.5 text-center">Current plan is Premium or Ultra</p>
+                        )}
+                      </div>
                     );
                   })}
                 </div>

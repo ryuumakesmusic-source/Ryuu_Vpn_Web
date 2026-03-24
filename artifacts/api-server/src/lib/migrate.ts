@@ -58,25 +58,6 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
     `,
   },
-  {
-    name: "004_add_performance_indexes",
-    sql: `
-      -- Index for VPN data lookups (used in dashboard stats)
-      CREATE INDEX IF NOT EXISTS idx_users_remnawave_uuid ON users(remnawave_uuid) WHERE remnawave_uuid IS NOT NULL;
-      
-      -- Index for plan filtering
-      CREATE INDEX IF NOT EXISTS idx_users_plan_id ON users(plan_id) WHERE plan_id IS NOT NULL;
-      
-      -- Composite index for monthly purchase limit check
-      CREATE INDEX IF NOT EXISTS idx_plan_purchases_user_month ON plan_purchases(user_id, purchased_at DESC);
-      
-      -- Index for admin user queries
-      CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at DESC);
-      
-      -- Index for active top-up requests (most common admin query)
-      CREATE INDEX IF NOT EXISTS idx_topup_requests_status_created ON topup_requests(status, created_at DESC);
-    `,
-  },
 ];
 
 export async function runMigrations() {

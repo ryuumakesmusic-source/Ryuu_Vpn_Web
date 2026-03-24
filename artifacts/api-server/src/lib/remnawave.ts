@@ -95,14 +95,21 @@ export async function renewRemnawaveUserPlan(
   additionalTrafficBytes: number,
   validityDays: number,
 ): Promise<RemnawaveUser> {
-  // Fetch current used traffic so we can carry the data forward
+  // Fetch current state so we can calculate rollover
   const current = await rwFetch(`/api/users/${uuid}`);
   const currentUser: RemnawaveUser = current?.response ?? current;
   const usedBytes: number = currentUser.usedTrafficBytes ?? 0;
+  const currentLimitBytes: number = currentUser.trafficLimitBytes ?? 0;
 
-  // New limit = what they've already used + fresh allocation from the new plan
-  // This gives them exactly the plan's GB amount as fresh usable data
-  const newTrafficLimitBytes = usedBytes + additionalTrafficBytes;
+  // Unused data from the old plan, capped at the new plan's full allocation
+  // e.g. 90 GB remaining + buy Pro (120 GB) → carry over 90 GB (under cap)
+  //      200 GB remaining + buy Pro (120 GB) → carry over 120 GB (capped)
+  const unusedBytes = Math.max(0, currentLimitBytes - usedBytes);
+  const rolloverBytes = Math.min(unusedBytes, additionalTrafficBytes);
+
+  // New limit = already used + fresh plan GB + rolled-over GB
+  // Remaining after renewal = additionalTrafficBytes + rolloverBytes (max 2× new plan)
+  const newTrafficLimitBytes = usedBytes + additionalTrafficBytes + rolloverBytes;
 
   // Expiry starts fresh from today + plan validity
   const expireAt = new Date();
@@ -118,6 +125,10 @@ export async function renewRemnawaveUserPlan(
     }),
   });
   return data?.response ?? data;
+}
+
+export async function deleteRemnawaveUser(uuid: string): Promise<void> {
+  await rwFetch(`/api/users/${uuid}`, { method: "DELETE" });
 }
 
 export async function getRemnawaveUser(uuid: string): Promise<RemnawaveUser> {

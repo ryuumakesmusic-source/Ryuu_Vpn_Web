@@ -1,13 +1,14 @@
 import { motion } from "framer-motion";
-import { Wallet, ArrowUpRight, TrendingUp } from "lucide-react";
+import { Wallet, ArrowUpRight, History, TrendingUp } from "lucide-react";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 
 interface EnhancedBalanceCardProps {
   balance: number;
   onTopUp: () => void;
+  onViewHistory: () => void;
 }
 
-export function EnhancedBalanceCard({ balance, onTopUp }: EnhancedBalanceCardProps) {
+export function EnhancedBalanceCard({ balance, onTopUp, onViewHistory }: EnhancedBalanceCardProps) {
   const isLowBalance = balance < 5000;
 
   return (
@@ -85,16 +86,27 @@ export function EnhancedBalanceCard({ balance, onTopUp }: EnhancedBalanceCardPro
           )}
         </div>
 
-        {/* Action Button */}
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={onTopUp}
-          className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-primary to-purple-600 text-white font-bold text-sm hover:shadow-lg hover:shadow-primary/50 transition-all"
-        >
-          <ArrowUpRight className="w-5 h-5" />
-          Top Up
-        </motion.button>
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onTopUp}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-primary to-purple-600 text-white font-bold text-sm hover:shadow-lg hover:shadow-primary/50 transition-all"
+          >
+            <ArrowUpRight className="w-4 h-4" />
+            Top Up
+          </motion.button>
+          
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onViewHistory}
+            className="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white transition-all"
+          >
+            <History className="w-4 h-4" />
+          </motion.button>
+        </div>
       </div>
     </motion.div>
   );

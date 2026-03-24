@@ -4,7 +4,7 @@ import { eq, desc } from "drizzle-orm";
 import { requireAdmin, type AdminRequest } from "../middlewares/adminAuth.js";
 import { getPlan, PLANS } from "../lib/plans.js";
 import { sendTelegramMessage, notifyUser } from "../lib/telegram.js";
-import { businessLogger } from "../lib/businessLogger.js";
+import { getRemnawaveUser, deleteRemnawaveUser } from "../lib/remnawave.js";
 
 const router = Router();
 
@@ -77,47 +77,23 @@ router.post("/topups/:id/approve", requireAdmin, async (req: AdminRequest, res) 
     return;
   }
 
-  // Use transaction to ensure atomicity
-  const result = await db.transaction(async (tx) => {
-    // Update topup status
-    await tx
-      .update(topupRequestsTable)
-      .set({ status: "approved", adminNote: adminNote?.trim() || null, updatedAt: new Date() })
-      .where(eq(topupRequestsTable.id, id));
+  await db
+    .update(topupRequestsTable)
+    .set({ status: "approved", adminNote: adminNote?.trim() || null, updatedAt: new Date() })
+    .where(eq(topupRequestsTable.id, id));
 
-    // Get user info
-    const [user] = await tx
-      .select({ balanceKs: usersTable.balanceKs, username: usersTable.username, telegramId: usersTable.telegramId })
-      .from(usersTable)
-      .where(eq(usersTable.id, topup.userId))
-      .limit(1);
+  const [user] = await db
+    .select({ balanceKs: usersTable.balanceKs, username: usersTable.username, telegramId: usersTable.telegramId })
+    .from(usersTable)
+    .where(eq(usersTable.id, topup.userId))
+    .limit(1);
 
-    if (!user) {
-      throw new Error("User not found");
-    }
+  const newBalance = (user?.balanceKs ?? 0) + topup.amountKs;
 
-    const newBalance = user.balanceKs + topup.amountKs;
-
-    // Update user balance
-    await tx
-      .update(usersTable)
-      .set({ balanceKs: newBalance, updatedAt: new Date() })
-      .where(eq(usersTable.id, topup.userId));
-
-    return { user, newBalance };
-  });
-
-  const { user, newBalance } = result;
-
-  // Log top-up approval
-  businessLogger.topupApproved({
-    userId: topup.userId,
-    username: user.username,
-    amountKs: topup.amountKs,
-    newBalance,
-    approvedBy: req.user!.username,
-    paymentMethod: topup.paymentMethod,
-  });
+  await db
+    .update(usersTable)
+    .set({ balanceKs: newBalance, updatedAt: new Date() })
+    .where(eq(usersTable.id, topup.userId));
 
   const notifyText = [
     `✅ <b>Top-Up Approved</b>`,
@@ -316,6 +292,78 @@ router.post("/users/:id/adjust-balance", requireAdmin, async (req: AdminRequest,
     .where(eq(usersTable.id, id));
 
   res.json({ success: true, balanceKs: newBalance });
+});
+
+router.delete("/users/:id/package", requireAdmin, async (req: AdminRequest, res) => {
+  const { id } = req.params;
+
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, id))
+    .limit(1);
+
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  if (!user.planId || !user.remnawaveUuid) {
+    res.status(400).json({ error: "User has no active package" });
+    return;
+  }
+
+  const plan = getPlan(user.planId);
+  if (!plan) {
+    res.status(400).json({ error: "Unknown plan on this account" });
+    return;
+  }
+
+  // Get current expiry from Remnawave to calculate pro-rated refund
+  let daysRemaining = 0;
+  try {
+    const rwUser = await getRemnawaveUser(user.remnawaveUuid);
+    if (rwUser.expireAt) {
+      const expireAt = new Date(rwUser.expireAt);
+      const now = new Date();
+      const msRemaining = expireAt.getTime() - now.getTime();
+      daysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+    }
+  } catch (err) {
+    req.log.warn({ err }, "Failed to fetch Remnawave user for refund calculation");
+  }
+
+  // Pro-rated refund: floor so we never overpay
+  const refundKs = Math.floor((daysRemaining / plan.validityDays) * plan.priceKs);
+
+  // Hard delete the user from Remnawave — subscription URL becomes invalid immediately
+  try {
+    await deleteRemnawaveUser(user.remnawaveUuid);
+  } catch (err) {
+    req.log.warn({ err }, "Failed to delete Remnawave user — continuing with DB update");
+  }
+
+  const newBalance = user.balanceKs + refundKs;
+
+  // Clear all Remnawave fields — account no longer exists there
+  await db
+    .update(usersTable)
+    .set({ planId: null, remnawaveUuid: null, remnawaveShortUuid: null, balanceKs: newBalance, updatedAt: new Date() })
+    .where(eq(usersTable.id, id));
+
+  if (user.telegramId) {
+    const msg = [
+      `📦 <b>Package Cancelled by Admin</b>`,
+      ``,
+      `📋 Plan: <b>${plan.name}</b>`,
+      `⏳ Days remaining: <b>${daysRemaining}</b>`,
+      `💰 Refund: <b>${refundKs.toLocaleString()} Ks</b>`,
+      `💳 New balance: <b>${newBalance.toLocaleString()} Ks</b>`,
+    ].join("\n");
+    notifyUser(user.telegramId, msg).catch(() => {});
+  }
+
+  res.json({ success: true, daysRemaining, refundKs, newBalance });
 });
 
 router.delete("/users/:id", requireAdmin, async (req: AdminRequest, res) => {

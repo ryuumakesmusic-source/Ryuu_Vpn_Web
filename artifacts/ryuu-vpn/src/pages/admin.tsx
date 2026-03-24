@@ -6,7 +6,7 @@ import { api, type AdminTopup, type AdminUser } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import {
   Check, X, Users, CreditCard, RefreshCw, ChevronDown, ChevronUp,
-  ArrowLeft, ShieldCheck, ShieldOff, Loader2, Plus, Minus, Trash2,
+  ArrowLeft, ShieldCheck, ShieldOff, Loader2, Plus, Minus, Trash2, PackageX,
 } from "lucide-react";
 
 function StatusBadge({ status }: { status: string }) {
@@ -80,6 +80,7 @@ export default function AdminPage() {
   const [adjustAmount, setAdjustAmount] = useState<Record<string, string>>({});
   const [expandedScreenshot, setExpandedScreenshot] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [cancelPackageConfirm, setCancelPackageConfirm] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && (!user || !user.isAdmin)) {
@@ -179,6 +180,23 @@ export default function AdminPage() {
       await api.admin.deleteUser(userId);
       toast({ title: "Account deleted", description: "User and all their data have been removed." });
       setDeleteConfirm(null);
+      fetchData();
+    } catch (err) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Failed", variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCancelPackage = async (userId: string) => {
+    setActionLoading(userId + "_cancel_pkg");
+    try {
+      const result = await api.admin.cancelPackage(userId);
+      toast({
+        title: "Package cancelled",
+        description: `${result.daysRemaining} days remaining → ${result.refundKs.toLocaleString()} Ks refunded. New balance: ${result.newBalance.toLocaleString()} Ks`,
+      });
+      setCancelPackageConfirm(null);
       fetchData();
     } catch (err) {
       toast({ title: "Error", description: err instanceof Error ? err.message : "Failed", variant: "destructive" });
@@ -377,6 +395,39 @@ export default function AdminPage() {
                         Deduct
                       </button>
                     </div>
+
+                    {/* Cancel Package (pro-rated refund) */}
+                    {u.planId && (
+                      <div className="flex items-center gap-1.5">
+                        {cancelPackageConfirm === u.id ? (
+                          <>
+                            <button
+                              onClick={() => handleCancelPackage(u.id)}
+                              disabled={actionLoading !== null}
+                              className="flex items-center gap-1 px-2.5 h-8 rounded-lg bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/50 text-orange-400 text-xs font-bold transition-all disabled:opacity-40"
+                            >
+                              {actionLoading === u.id + "_cancel_pkg" ? <Loader2 className="w-3 h-3 animate-spin" /> : "Confirm Cancel & Refund"}
+                            </button>
+                            <button
+                              onClick={() => setCancelPackageConfirm(null)}
+                              className="px-2.5 h-8 rounded-lg bg-white/5 border border-white/10 text-white/50 text-xs font-bold hover:text-white transition-all"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => setCancelPackageConfirm(u.id)}
+                            disabled={actionLoading !== null}
+                            title="Cancel package & pro-rated refund"
+                            className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-400 text-xs font-bold transition-all disabled:opacity-40"
+                          >
+                            <PackageX className="w-3.5 h-3.5" />
+                            Cancel Pkg
+                          </button>
+                        )}
+                      </div>
+                    )}
 
                     {/* Admin toggle + Delete */}
                     <div className="flex items-center gap-1.5">
