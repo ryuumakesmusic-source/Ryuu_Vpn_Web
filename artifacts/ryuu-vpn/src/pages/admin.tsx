@@ -101,11 +101,7 @@ export default function AdminPage() {
         const data = await api.admin.users();
         setUsers(data);
       } else if (tab === "announcements") {
-        const response = await fetch("/api/admin/announcements", {
-          credentials: "include",
-        });
-        const data = await response.json();
-        setAnnouncements(data);
+        setAnnouncements([]);
       }
     } catch (err) {
       toast({ title: "Error", description: err instanceof Error ? err.message : "Failed to load", variant: "destructive" });
@@ -581,7 +577,7 @@ export default function AdminPage() {
                   )}
                 </button>
               </div>
-            </div>
+              </div>
 
             {/* Announcements List */}
             <div className="space-y-4">
