@@ -3,8 +3,11 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { api, type DashboardStats, type SubscriptionInfo, type Plan, type PurchaseStatus, type TopupRequest } from "@/lib/api";
-import { LogOut, Copy, Check, Wifi, Shield, Clock, Database, Wallet, ShoppingCart, ArrowUpRight, Gift, X, User, History, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { LogOut, Copy, Check, Wifi, Shield, Clock, Database, Wallet, ShoppingCart, ArrowUpRight, Gift, X, User, History, ChevronDown, ChevronUp, RefreshCw, TrendingUp, Zap, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { GlassCard } from "@/components/ui/GlassCard";
+import { CircularProgress } from "@/components/ui/CircularProgress";
+import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 
 function StatusBadge({ status }: { status: string }) {
   const isActive = status === "ACTIVE";
@@ -279,69 +282,128 @@ export default function DashboardPage() {
         ) : error ? (
           <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6 text-red-400 text-sm">{error}</div>
         ) : (
-          <div className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Plan & Status */}
-              <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}
-                className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Shield className="w-4 h-4 text-primary" />
-                  <span className="text-xs font-bold uppercase tracking-widest text-white/50">Your Plan</span>
-                </div>
-                {stats?.status === "NO_PLAN" ? (
-                  <div>
-                    <StatusBadge status="NO_PLAN" />
-                    <p className="text-white/40 text-sm mt-3">Top up your balance and buy a plan below to get started.</p>
+          <div className="space-y-6">
+            {/* Top Stats Grid - 3 Columns */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {/* Data Usage Card with Circular Progress */}
+              <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
+                <GlassCard gradient className="p-6">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Database className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-bold uppercase tracking-widest text-white/50">Data Usage</span>
                   </div>
-                ) : (
-                  <>
-                    <div className="flex items-start justify-between mb-6">
+                  {stats?.status === "NO_PLAN" ? (
+                    <div className="flex items-center justify-center py-8">
+                      <p className="text-white/30 text-sm">No active plan</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center">
+                      <CircularProgress 
+                        percentage={stats?.limitGb ? (stats.usedGb / stats.limitGb) * 100 : 0}
+                        size={140}
+                        strokeWidth={10}
+                        showLabel={true}
+                        label="USED"
+                      />
+                      <div className="mt-6 text-center space-y-2">
+                        <div className="flex items-center justify-center gap-2">
+                          <AnimatedCounter value={stats?.usedGb ?? 0} decimals={1} className="text-2xl font-bold text-white" />
+                          <span className="text-white/50 text-sm">/ {stats?.limitGb} GB</span>
+                        </div>
+                        <div className="flex items-center justify-center gap-1.5 text-xs">
+                          <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                          <AnimatedCounter value={stats?.remainingGb ?? 0} decimals={1} className="text-primary font-bold" />
+                          <span className="text-white/40">GB remaining</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </GlassCard>
+              </motion.div>
+
+              {/* Plan Status Card */}
+              <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.15 }}>
+                <GlassCard gradient className="p-6 h-full">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Shield className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-bold uppercase tracking-widest text-white/50">Your Plan</span>
+                  </div>
+                  {stats?.status === "NO_PLAN" ? (
+                    <div className="flex flex-col items-center justify-center py-8">
+                      <StatusBadge status="NO_PLAN" />
+                      <p className="text-white/40 text-sm mt-4 text-center">Top up and buy a plan to get started</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
                       <div>
-                        <h2 className="font-display text-xl font-bold text-primary tracking-widest mb-1">
+                        <h2 className="font-display text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-cyan-400 tracking-widest mb-2">
                           {PLAN_LABELS[stats?.planId ?? ""] ?? stats?.planName}
                         </h2>
                         <StatusBadge status={stats?.status ?? "unknown"} />
                       </div>
+                      <div className="grid grid-cols-2 gap-3 pt-4">
+                        <div className="bg-black/30 rounded-xl p-3 border border-white/5">
+                          <div className="text-xs text-white/40 uppercase tracking-wider mb-1">Used</div>
+                          <div className="font-display text-xl font-bold text-white">
+                            <AnimatedCounter value={stats?.usedGb ?? 0} decimals={1} /> GB
+                          </div>
+                        </div>
+                        <div className="bg-black/30 rounded-xl p-3 border border-white/5">
+                          <div className="text-xs text-white/40 uppercase tracking-wider mb-1">Total</div>
+                          <div className="font-display text-xl font-bold text-primary">
+                            <AnimatedCounter value={stats?.limitGb ?? 0} decimals={0} /> GB
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <DataBar used={stats?.usedGb ?? 0} total={stats?.limitGb ?? 0} label="Data Usage" />
-                    <div className="flex justify-between text-sm font-bold mt-3">
-                      <span className="text-white/50">{stats?.usedGb} GB used</span>
-                      <span className="text-white">{stats?.remainingGb} GB left of {stats?.limitGb} GB</span>
-                    </div>
-                  </>
-                )}
+                  )}
+                </GlassCard>
               </motion.div>
 
-              {/* Expiry / Days */}
-              <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.15 }}
-                className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Clock className="w-4 h-4 text-secondary" />
-                  <span className="text-xs font-bold uppercase tracking-widest text-white/50">Validity</span>
-                </div>
-                {stats?.status === "NO_PLAN" ? (
-                  <p className="text-white/30 text-sm">No active subscription</p>
-                ) : (
-                  <>
-                    <div className="flex items-end gap-2 mb-2">
-                      <span className={`font-display text-6xl font-bold ${daysLeft !== null && daysLeft <= 3 ? "text-red-400" : "text-white"}`}>
-                        {daysLeft ?? "—"}
-                      </span>
-                      <span className="text-white/50 font-bold text-lg mb-2">days left</span>
+              {/* Expiry Card */}
+              <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
+                <GlassCard gradient className="p-6 h-full">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Calendar className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs font-bold uppercase tracking-widest text-white/50">Validity</span>
+                  </div>
+                  {stats?.status === "NO_PLAN" ? (
+                    <div className="flex items-center justify-center py-8">
+                      <p className="text-white/30 text-sm">No active subscription</p>
                     </div>
-                    {stats?.expireAt && (
-                      <p className="text-sm text-white/40">
-                        Expires: {new Date(stats.expireAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
-                      </p>
-                    )}
-                    {daysLeft !== null && daysLeft <= 5 && (
-                      <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 font-medium">
-                        Your plan expires soon. Buy a new plan to keep your VPN active.
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-end gap-3">
+                        <span className={`font-display text-6xl font-bold ${daysLeft !== null && daysLeft <= 3 ? "text-red-400" : "text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-primary"}`}>
+                          <AnimatedCounter value={daysLeft ?? 0} decimals={0} />
+                        </span>
+                        <span className="text-white/50 font-bold text-lg mb-3">days left</span>
                       </div>
-                    )}
-                  </>
-                )}
+                      {stats?.expireAt && (
+                        <div className="bg-black/30 rounded-xl p-3 border border-white/5">
+                          <div className="text-xs text-white/40 uppercase tracking-wider mb-1">Expires</div>
+                          <div className="text-sm text-white font-medium">
+                            {new Date(stats.expireAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          </div>
+                        </div>
+                      )}
+                      {daysLeft !== null && daysLeft <= 5 && (
+                        <motion.div 
+                          initial={{ scale: 0.95, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2"
+                        >
+                          <Zap className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                          <p className="text-xs text-red-400 font-medium">
+                            Plan expires soon! Renew to keep your VPN active.
+                          </p>
+                        </motion.div>
+                      )}
+                    </div>
+                  )}
+                </GlassCard>
               </motion.div>
+            </div>
 
               {sub?.subscriptionUrl && (
                 <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}
