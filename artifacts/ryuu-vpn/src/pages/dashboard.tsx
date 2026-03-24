@@ -251,7 +251,7 @@ export default function DashboardPage() {
         {/* Enhanced Balance Card */}
         <div className="mb-6">
           <EnhancedBalanceCard
-            balance={stats?.balanceKs ?? user?.balanceKs ?? 0}
+            balance={stats?.balanceKs ?? 0}
             onTopUp={() => navigate("/topup")}
             onViewHistory={() => setTopupsOpen(!topupsOpen)}
           />
