@@ -3,14 +3,13 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { api, type DashboardStats, type SubscriptionInfo, type Plan, type PurchaseStatus, type TopupRequest } from "@/lib/api";
-import { LogOut, Copy, Check, Wifi, Shield, Clock, Database, Wallet, ShoppingCart, ArrowUpRight, Gift, X, User, History, ChevronDown, ChevronUp, RefreshCw, TrendingUp, Zap, Calendar } from "lucide-react";
+import { LogOut, Copy, Check, Wifi, Shield, Clock, Database, Wallet, ShoppingCart, ArrowUpRight, Gift, X, User, History, ChevronDown, ChevronUp, RefreshCw, TrendingUp, Zap, Calendar, Megaphone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { CircularProgress } from "@/components/ui/CircularProgress";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 import { QuickActionsHub } from "@/components/dashboard/QuickActionsHub";
 import { EnhancedBalanceCard } from "@/components/dashboard/EnhancedBalanceCard";
-import { AnnouncementModal } from "@/components/AnnouncementModal";
 
 function StatusBadge({ status }: { status: string }) {
   const isActive = status === "ACTIVE";
@@ -269,6 +268,37 @@ export default function DashboardPage() {
 
         {/* Quick Actions Hub */}
         <QuickActionsHub />
+
+        {/* Inline Announcement */}
+        <AnimatePresence>
+          {announcement && showAnnouncement && (
+            <motion.div
+              initial={{ opacity: 0, y: -8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.98 }}
+              transition={{ duration: 0.25 }}
+              className="mb-5"
+            >
+              <div className="relative flex items-start gap-4 p-5 bg-gradient-to-r from-purple-900/40 via-purple-800/30 to-indigo-900/40 border border-purple-500/30 rounded-2xl overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 via-transparent to-indigo-500/5 pointer-events-none" />
+                <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
+                  <Megaphone className="w-4 h-4 text-purple-300" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-widest text-purple-400 mb-1">Announcement</p>
+                  <h3 className="font-bold text-white text-sm mb-1.5 leading-snug">{announcement.title}</h3>
+                  <p className="text-white/70 text-sm leading-relaxed whitespace-pre-wrap">{announcement.message}</p>
+                </div>
+                <button
+                  onClick={() => setShowAnnouncement(false)}
+                  className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-white/70 hover:bg-white/10 transition-all"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {pendingTopup && (
           <motion.div initial={{ y: -10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-5 flex items-center gap-3 p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
@@ -663,15 +693,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Announcement Modal */}
-      {announcement && (
-        <AnnouncementModal
-          isOpen={showAnnouncement}
-          onClose={() => setShowAnnouncement(false)}
-          title={announcement.title}
-          message={announcement.message}
-        />
-      )}
     </div>
   );
 }
