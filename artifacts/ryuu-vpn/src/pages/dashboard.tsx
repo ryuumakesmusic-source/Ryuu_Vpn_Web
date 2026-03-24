@@ -8,6 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { CircularProgress } from "@/components/ui/CircularProgress";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
+import { QuickActionsHub } from "@/components/dashboard/QuickActionsHub";
+import { EnhancedBalanceCard } from "@/components/dashboard/EnhancedBalanceCard";
 
 function StatusBadge({ status }: { status: string }) {
   const isActive = status === "ACTIVE";
@@ -241,26 +243,22 @@ export default function DashboardPage() {
       </nav>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
-        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-8 flex items-start justify-between flex-wrap gap-4">
-          <div>
-            <p className="text-white/40 text-sm mb-1 font-medium">Welcome back,</p>
-            <h1 className="font-display text-3xl font-bold text-white uppercase tracking-wide">{user?.username}</h1>
-          </div>
-          <div className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.07] rounded-2xl px-5 py-3">
-            <Wallet className="w-5 h-5 text-primary" />
-            <div>
-              <p className="text-xs text-white/40 uppercase tracking-widest">Balance</p>
-              <p className="font-display text-xl font-bold text-primary">{(stats?.balanceKs ?? user?.balanceKs ?? 0).toLocaleString()} Ks</p>
-            </div>
-            <button
-              onClick={() => navigate("/topup")}
-              className="ml-3 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/30 text-primary text-xs font-bold hover:bg-primary/20 transition-all"
-            >
-              <ArrowUpRight className="w-3.5 h-3.5" />
-              Top Up
-            </button>
-          </div>
+        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-6">
+          <p className="text-white/40 text-sm mb-1 font-medium">Welcome back,</p>
+          <h1 className="font-display text-3xl font-bold text-white uppercase tracking-wide">{user?.username}</h1>
         </motion.div>
+
+        {/* Enhanced Balance Card */}
+        <div className="mb-6">
+          <EnhancedBalanceCard
+            balance={stats?.balanceKs ?? user?.balanceKs ?? 0}
+            onTopUp={() => navigate("/topup")}
+            onViewHistory={() => setTopupsOpen(!topupsOpen)}
+          />
+        </div>
+
+        {/* Quick Actions Hub */}
+        <QuickActionsHub />
 
         {pendingTopup && (
           <motion.div initial={{ y: -10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-5 flex items-center gap-3 p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
@@ -453,6 +451,7 @@ export default function DashboardPage() {
                   <span className="text-xs font-bold uppercase tracking-widest text-white/50">Buy a Plan</span>
                 </div>
                 <button
+                  data-gift-button
                   onClick={() => setGiftModalOpen(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-500/10 border border-pink-500/30 text-pink-400 text-xs font-bold hover:bg-pink-500/20 transition-all"
                 >
