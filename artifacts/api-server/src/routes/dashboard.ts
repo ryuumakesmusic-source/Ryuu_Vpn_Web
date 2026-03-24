@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { db, usersTable, planPurchasesTable, pool } from "@workspace/db";
 import { eq, and, gte, count, sql } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../middlewares/auth.js";
@@ -15,6 +16,16 @@ const router = Router();
 
 const MONTHLY_PURCHASE_LIMIT = 2;
 const PREMIUM_PLAN_IDS = ["premium", "ultra"];
+
+// Rate limiter for plan purchases - max 5 attempts per 15 minutes
+const purchaseLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many purchase attempts. Please wait 15 minutes and try again." },
+  skipSuccessfulRequests: false,
+});
 
 router.get("/stats", requireAuth, async (req: AuthRequest, res) => {
   const [user] = await db
@@ -132,7 +143,7 @@ router.get("/purchase-status", requireAuth, async (req: AuthRequest, res) => {
   });
 });
 
-router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
+router.post("/buy-plan", requireAuth, purchaseLimiter, async (req: AuthRequest, res) => {
   const { planId } = req.body as { planId: string };
 
   const plan = getPlan(planId);
