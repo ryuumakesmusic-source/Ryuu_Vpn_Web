@@ -191,7 +191,7 @@ export default function DashboardPage() {
     }
   };
 
-  const handleLogout = () => { logout(); navigate("/"); };
+  const handleLogout = async () => { await logout(); navigate("/"); };
 
   const daysLeft = stats?.expireAt
     ? Math.max(0, Math.ceil((new Date(stats.expireAt).getTime() - Date.now()) / 86400000))
