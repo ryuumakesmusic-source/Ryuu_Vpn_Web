@@ -73,9 +73,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const getTelegramId = (): string | undefined => {
     try {
-      const tg = (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id;
-      return tg ? String(tg) : undefined;
-    } catch {
+      const tg = (window as any).Telegram?.WebApp;
+      if (!tg) {
+        console.log('[Auth] Telegram WebApp not available');
+        return undefined;
+      }
+      
+      // Wait for Telegram SDK to be ready
+      if (tg.initDataUnsafe?.user?.id) {
+        const id = String(tg.initDataUnsafe.user.id);
+        console.log('[Auth] Telegram ID found:', id);
+        return id;
+      }
+      
+      console.log('[Auth] Telegram ID not found in initDataUnsafe');
+      return undefined;
+    } catch (err) {
+      console.error('[Auth] Error getting Telegram ID:', err);
       return undefined;
     }
   };
