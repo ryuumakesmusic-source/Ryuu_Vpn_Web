@@ -76,23 +76,37 @@ router.post("/topups/:id/approve", requireAdmin, async (req: AdminRequest, res) 
     return;
   }
 
-  await db
-    .update(topupRequestsTable)
-    .set({ status: "approved", adminNote: adminNote?.trim() || null, updatedAt: new Date() })
-    .where(eq(topupRequestsTable.id, id));
+  // Use transaction to ensure atomicity
+  const result = await db.transaction(async (tx) => {
+    // Update topup status
+    await tx
+      .update(topupRequestsTable)
+      .set({ status: "approved", adminNote: adminNote?.trim() || null, updatedAt: new Date() })
+      .where(eq(topupRequestsTable.id, id));
 
-  const [user] = await db
-    .select({ balanceKs: usersTable.balanceKs, username: usersTable.username, telegramId: usersTable.telegramId })
-    .from(usersTable)
-    .where(eq(usersTable.id, topup.userId))
-    .limit(1);
+    // Get user info
+    const [user] = await tx
+      .select({ balanceKs: usersTable.balanceKs, username: usersTable.username, telegramId: usersTable.telegramId })
+      .from(usersTable)
+      .where(eq(usersTable.id, topup.userId))
+      .limit(1);
 
-  const newBalance = (user?.balanceKs ?? 0) + topup.amountKs;
+    if (!user) {
+      throw new Error("User not found");
+    }
 
-  await db
-    .update(usersTable)
-    .set({ balanceKs: newBalance, updatedAt: new Date() })
-    .where(eq(usersTable.id, topup.userId));
+    const newBalance = user.balanceKs + topup.amountKs;
+
+    // Update user balance
+    await tx
+      .update(usersTable)
+      .set({ balanceKs: newBalance, updatedAt: new Date() })
+      .where(eq(usersTable.id, topup.userId));
+
+    return { user, newBalance };
+  });
+
+  const { user, newBalance } = result;
 
   const notifyText = [
     `✅ <b>Top-Up Approved</b>`,

@@ -62,8 +62,6 @@ router.get("/stats", requireAuth, async (req: AuthRequest, res) => {
   const limitBytes: number = vpnUser?.trafficLimitBytes ?? plan?.trafficLimitBytes ?? 0;
   const remainingBytes = Math.max(0, limitBytes - usedBytes);
 
-  console.log(`[Dashboard Stats] User: ${user.username}, Balance from DB: ${user.balanceKs}`);
-  
   res.json({
     username: user.username,
     planId: user.planId,
