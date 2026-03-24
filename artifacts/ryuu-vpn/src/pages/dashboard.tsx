@@ -405,9 +405,9 @@ export default function DashboardPage() {
               </motion.div>
             </div>
 
-              {sub?.subscriptionUrl && (
-                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}
-                  className="md:col-span-2 bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6">
+            {sub?.subscriptionUrl && (
+              <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.25 }}>
+                <GlassCard className="p-6">
                   <div className="flex items-center gap-2 mb-4">
                     <Wifi className="w-4 h-4 text-primary" />
                     <span className="text-xs font-bold uppercase tracking-widest text-white/50">VPN Subscription Link</span>
@@ -417,12 +417,13 @@ export default function DashboardPage() {
                     <code className="flex-1 text-xs text-primary/80 truncate font-mono">{sub.subscriptionUrl}</code>
                     <CopyButton value={sub.subscriptionUrl} />
                   </div>
-                </motion.div>
-              )}
+                </GlassCard>
+              </motion.div>
+            )}
 
-              {stats?.status !== "NO_PLAN" && (
-                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.25 }}
-                  className={`${sub?.subscriptionUrl ? "" : "md:col-span-2"} bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6`}>
+            {stats?.status !== "NO_PLAN" && (
+              <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }}>
+                <GlassCard className="p-6">
                   <div className="flex items-center gap-2 mb-4">
                     <Database className="w-4 h-4 text-secondary" />
                     <span className="text-xs font-bold uppercase tracking-widest text-white/50">Usage Details</span>
@@ -439,9 +440,9 @@ export default function DashboardPage() {
                       </div>
                     ))}
                   </div>
-                </motion.div>
-              )}
-            </div>
+                </GlassCard>
+              </motion.div>
+            )}
 
             {/* Buy a Plan */}
             <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }}
