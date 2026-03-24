@@ -1,8 +1,10 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { WelcomeAnnouncement } from "@/components/WelcomeAnnouncement";
+import { useState, useEffect } from "react";
 import HomePage from "@/pages/home";
 import DashboardPage from "@/pages/dashboard";
 import TopupPage from "@/pages/topup";
@@ -19,14 +21,43 @@ const queryClient = new QueryClient({
 });
 
 function Router() {
+  const { user, loading } = useAuth();
+  const [, navigate] = useLocation();
+  const [showAnnouncement, setShowAnnouncement] = useState(false);
+
+  useEffect(() => {
+    if (!loading && user) {
+      // Check if user has seen the announcement
+      const hasSeenAnnouncement = localStorage.getItem('ryuu_seen_announcement');
+      
+      if (!hasSeenAnnouncement) {
+        setShowAnnouncement(true);
+      } else {
+        // If logged in and seen announcement, redirect to dashboard from home
+        if (window.location.pathname === '/') {
+          navigate('/dashboard');
+        }
+      }
+    }
+  }, [user, loading, navigate]);
+
+  const handleDismissAnnouncement = () => {
+    localStorage.setItem('ryuu_seen_announcement', 'true');
+    setShowAnnouncement(false);
+    navigate('/dashboard');
+  };
+
   return (
-    <Switch>
-      <Route path="/" component={HomePage} />
-      <Route path="/dashboard" component={DashboardPage} />
-      <Route path="/topup" component={TopupPage} />
-      <Route path="/admin" component={AdminPage} />
-      <Route component={NotFound} />
-    </Switch>
+    <>
+      {showAnnouncement && <WelcomeAnnouncement onDismiss={handleDismissAnnouncement} />}
+      <Switch>
+        <Route path="/" component={HomePage} />
+        <Route path="/dashboard" component={DashboardPage} />
+        <Route path="/topup" component={TopupPage} />
+        <Route path="/admin" component={AdminPage} />
+        <Route component={NotFound} />
+      </Switch>
+    </>
   );
 }
 
