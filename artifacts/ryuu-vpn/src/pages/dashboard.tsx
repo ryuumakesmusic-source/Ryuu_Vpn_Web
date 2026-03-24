@@ -128,14 +128,10 @@ export default function DashboardPage() {
       setMyTopups(topups);
       setError(null);
       
-      // Show announcement if exists and not shown before
+      // Show announcement if exists (every time)
       if (announcementData && !silent) {
-        const lastShownId = localStorage.getItem('lastAnnouncementId');
-        if (lastShownId !== announcementData.id) {
-          setAnnouncement({ title: announcementData.title, message: announcementData.message });
-          setShowAnnouncement(true);
-          localStorage.setItem('lastAnnouncementId', announcementData.id);
-        }
+        setAnnouncement({ title: announcementData.title, message: announcementData.message });
+        setShowAnnouncement(true);
       }
     } catch (e) {
       if (!silent) setError((e as Error).message);
