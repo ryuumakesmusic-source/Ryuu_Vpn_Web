@@ -53,7 +53,10 @@ export function AnimatedCounter({
       transition={{ duration: 0.5 }}
       className={className}
     >
-      {displayValue.toFixed(decimals)}{suffix}
+      {displayValue.toLocaleString('en-US', { 
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals 
+      })}{suffix}
     </motion.span>
   );
 }
