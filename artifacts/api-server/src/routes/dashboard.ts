@@ -13,7 +13,7 @@ import { getPlan, PLANS } from "../lib/plans.js";
 
 const router = Router();
 
-const MONTHLY_PURCHASE_LIMIT = 2;
+const MONTHLY_PURCHASE_LIMIT = 3;
 const PREMIUM_PLAN_IDS = ["premium", "ultra"];
 
 router.get("/stats", requireAuth, async (req: AuthRequest, res) => {
