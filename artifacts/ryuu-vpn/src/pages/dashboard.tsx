@@ -123,14 +123,12 @@ export default function DashboardPage() {
       setPurchaseStatus(ps);
       setMyTopups(topups);
       setError(null);
-      // Refresh user data to get latest balance from database
-      await refreshUser();
     } catch (e) {
       if (!silent) setError((e as Error).message);
     } finally {
       if (!silent) setStatsLoading(false);
     }
-  }, [refreshUser]);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
