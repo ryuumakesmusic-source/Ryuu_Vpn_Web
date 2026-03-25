@@ -468,8 +468,9 @@ export default function DashboardPage() {
                     const canAfford = (stats?.balanceKs ?? user?.balanceKs ?? 0) >= plan.priceKs;
                     const blocked = !purchaseStatus?.canBuyStarter && plan.id === "starter";
                     const disabled = !canAfford || blocked || buyingPlan !== null;
-                    const hasBadge = plan.badge === "most_popular" || plan.badge === "best_value";
-                    
+                    const isFeatured = plan.id === "premium";
+                    const isBestValue = plan.id === "starter";
+
                     return (
                       <motion.div
                         key={plan.id}
@@ -478,34 +479,33 @@ export default function DashboardPage() {
                         transition={{ delay: 0.1 * plans.indexOf(plan) }}
                         whileHover={{ y: -4, scale: 1.02 }}
                         className={`relative border rounded-2xl p-6 transition-all ${
-                          hasBadge
+                          isFeatured
                             ? "border-primary/50 bg-gradient-to-br from-primary/10 via-purple-500/5 to-transparent shadow-lg shadow-primary/20"
                             : "border-white/10 bg-white/[0.02] hover:border-white/20"
                         }`}
                       >
-                        {/* Glow effect for featured plans */}
-                        {hasBadge && (
+                        {isFeatured && (
                           <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-cyan-500/10 rounded-2xl opacity-50" />
                         )}
-                        
+
                         <div className="relative z-10">
                           {/* Badge */}
-                          {plan.badge === "most_popular" && (
+                          {isFeatured && (
                             <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-primary mb-3">
                               <Star className="w-3.5 h-3.5 fill-primary" />
                               Most Popular
                             </div>
                           )}
-                          {plan.badge === "best_value" && (
+                          {isBestValue && (
                             <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-cyan-400 mb-3">
                               <Award className="w-3.5 h-3.5 fill-cyan-400" />
                               Best Value
                             </div>
                           )}
-                          
+
                           {/* Plan Name */}
                           <h3 className="font-display font-bold text-white text-base tracking-widest mb-2">{plan.name}</h3>
-                          
+
                           {/* Data & Validity */}
                           <div className="flex items-baseline gap-2 mb-1">
                             <span className="text-3xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-primary">
@@ -514,18 +514,24 @@ export default function DashboardPage() {
                             <span className="text-white/50 text-sm font-medium">GB</span>
                           </div>
                           <div className="text-xs text-white/40 mb-4">{plan.validityDays} days validity</div>
-                          
-                          {/* Features List */}
+
+                          {/* Features */}
                           <div className="space-y-2 mb-5 pb-5 border-b border-white/10">
-                            {plan.features.slice(0, 4).map((feature, idx) => (
-                              <div key={idx} className="flex items-start gap-2 text-xs text-white/70">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
-                                <span>{feature}</span>
-                              </div>
-                            ))}
+                            <div className="flex items-start gap-2 text-xs text-white/70">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
+                              <span>Singapore server</span>
+                            </div>
+                            <div className="flex items-start gap-2 text-xs text-white/70">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
+                              <span>Data rollover on renewal</span>
+                            </div>
+                            <div className="flex items-start gap-2 text-xs text-white/70">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
+                              <span>All apps supported</span>
+                            </div>
                           </div>
-                          
-                          {/* Price & Value */}
+
+                          {/* Price */}
                           <div className="mb-4">
                             <div className="flex items-baseline gap-2 mb-1">
                               <span className="text-2xl font-bold text-primary">
@@ -533,18 +539,11 @@ export default function DashboardPage() {
                               </span>
                               <span className="text-white/40 text-sm">Ks</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-white/30">
-                                {plan.pricePerGb} Ks/GB
-                              </span>
-                              {plan.savingsPercent && (
-                                <span className="text-[10px] font-bold text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded">
-                                  Save {plan.savingsPercent}%
-                                </span>
-                              )}
+                            <div className="text-[10px] text-white/30">
+                              {Math.round(plan.priceKs / plan.dataGb)} Ks/GB
                             </div>
                           </div>
-                          
+
                           {/* Buy Button */}
                           <motion.button
                             onClick={() => handleBuyPlan(plan.id)}
@@ -566,7 +565,7 @@ export default function DashboardPage() {
                               : !canAfford ? "Insufficient Balance"
                               : "Buy Now"}
                           </motion.button>
-                          
+
                           {blocked && (
                             <p className="text-[10px] text-white/25 mt-2 text-center">Current plan is Premium or Ultra</p>
                           )}
