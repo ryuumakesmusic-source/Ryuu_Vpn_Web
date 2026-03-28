@@ -1,20 +1,17 @@
 import { Router } from "express";
 import { db, usersTable, planPurchasesTable, pool } from "@workspace/db";
-import { eq, and, gte, count, sql } from "drizzle-orm";
+import { eq, and, gte, count } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../middlewares/auth.js";
 import {
   getRemnawaveUser,
-  getUserBandwidth,
   getSubscription,
   createRemnawaveUser,
   renewRemnawaveUserPlan,
 } from "../lib/remnawave.js";
 import { getPlan, PLANS } from "../lib/plans.js";
+import { MONTHLY_PURCHASE_LIMIT, PREMIUM_PLAN_IDS } from "../lib/constants.js";
 
 const router = Router();
-
-const MONTHLY_PURCHASE_LIMIT = 3;
-const PREMIUM_PLAN_IDS = ["premium", "ultra"];
 
 router.get("/stats", requireAuth, async (req: AuthRequest, res) => {
   const [user] = await db
@@ -57,13 +54,12 @@ router.get("/stats", requireAuth, async (req: AuthRequest, res) => {
   const vpnUser = rwUser.status === "fulfilled" ? rwUser.value : null;
   const sub = subscription.status === "fulfilled" ? subscription.value : null;
 
-  // Get usage from subscription endpoint - trafficUsedBytes is a string, need to parse it
-  const usedBytes: number = sub?.user?.trafficUsedBytes ? parseInt(sub.user.trafficUsedBytes, 10) : 0;
+  const usedBytes: number = sub?.user?.trafficUsedBytes
+    ? parseInt(sub.user.trafficUsedBytes, 10)
+    : 0;
   const limitBytes: number = vpnUser?.trafficLimitBytes ?? plan?.trafficLimitBytes ?? 0;
   const remainingBytes = Math.max(0, limitBytes - usedBytes);
 
-  console.log(`[Dashboard Stats] User: ${user.username}, Balance from DB: ${user.balanceKs}`);
-  
   res.json({
     username: user.username,
     planId: user.planId,
@@ -73,9 +69,9 @@ router.get("/stats", requireAuth, async (req: AuthRequest, res) => {
     usedBytes,
     limitBytes,
     remainingBytes,
-    usedGb: +(usedBytes / (1024 ** 3)).toFixed(2),
-    remainingGb: +(remainingBytes / (1024 ** 3)).toFixed(2),
-    limitGb: +(limitBytes / (1024 ** 3)).toFixed(2),
+    usedGb: +(usedBytes / 1024 ** 3).toFixed(2),
+    remainingGb: +(remainingBytes / 1024 ** 3).toFixed(2),
+    limitGb: +(limitBytes / 1024 ** 3).toFixed(2),
     balanceKs: user.balanceKs,
     bandwidth: sub,
   });
@@ -161,7 +157,7 @@ router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
 
     const user = userResult.rows[0];
 
-    // Rule 1 — max 2 purchases per calendar month
+    // Rule 1 — max purchases per calendar month
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const purchaseCountResult = await client.query(
@@ -227,7 +223,6 @@ router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
 
     const newBalance = user.balance_ks - plan.priceKs;
 
-    // Record purchase and update balance atomically
     await client.query(
       "INSERT INTO plan_purchases (user_id, plan_id, price_ks) VALUES ($1, $2, $3)",
       [user.id, planId, String(plan.priceKs)],
@@ -259,7 +254,10 @@ router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
 });
 
 router.post("/gift-plan", requireAuth, async (req: AuthRequest, res) => {
-  const { recipientUsername, planId } = req.body as { recipientUsername: string; planId: string };
+  const { recipientUsername, planId } = req.body as {
+    recipientUsername: string;
+    planId: string;
+  };
 
   const plan = getPlan(planId);
   if (!plan) {
@@ -267,120 +265,137 @@ router.post("/gift-plan", requireAuth, async (req: AuthRequest, res) => {
     return;
   }
 
-  const [buyer] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.id, req.user!.userId))
-    .limit(1);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
 
-  if (!buyer) {
-    res.status(404).json({ error: "Buyer not found" });
-    return;
-  }
-
-  // Cannot gift to yourself
-  if (buyer.username.toLowerCase() === recipientUsername.trim().toLowerCase()) {
-    res.status(400).json({ error: "You cannot gift a plan to yourself.", code: "SELF_GIFT" });
-    return;
-  }
-
-  // Look up recipient
-  const [recipient] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.username, recipientUsername.trim()))
-    .limit(1);
-
-  if (!recipient) {
-    res.status(404).json({
-      error: `No account found with username "${recipientUsername.trim()}". They need to register first.`,
-      code: "RECIPIENT_NOT_FOUND",
-    });
-    return;
-  }
-
-  // Check recipient's monthly purchase count
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const [{ purchasesThisMonth }] = await db
-    .select({ purchasesThisMonth: count() })
-    .from(planPurchasesTable)
-    .where(
-      and(
-        eq(planPurchasesTable.userId, recipient.id),
-        gte(planPurchasesTable.purchasedAt, monthStart),
-      ),
+    // Lock buyer row
+    const buyerResult = await client.query(
+      "SELECT * FROM users WHERE id = $1 FOR UPDATE",
+      [req.user!.userId],
     );
 
-  if (Number(purchasesThisMonth) >= MONTHLY_PURCHASE_LIMIT) {
-    res.status(403).json({
-      error: `${recipient.username} has already received ${MONTHLY_PURCHASE_LIMIT} plans this month. Their limit resets on the 1st of next month.`,
-      code: "RECIPIENT_MONTHLY_LIMIT_REACHED",
-    });
-    return;
-  }
-
-  // Downgrade rule — based on recipient's current plan
-  if (PREMIUM_PLAN_IDS.includes(recipient.planId ?? "") && planId === "starter") {
-    res.status(403).json({
-      error: `${recipient.username} is already on a Premium or Ultra plan. You cannot gift them a Starter plan.`,
-      code: "RECIPIENT_DOWNGRADE_BLOCKED",
-    });
-    return;
-  }
-
-  // Buyer must have enough balance
-  if (buyer.balanceKs < plan.priceKs) {
-    res.status(402).json({
-      error: `Insufficient balance. You need ${plan.priceKs.toLocaleString()} Ks but have ${buyer.balanceKs.toLocaleString()} Ks.`,
-      code: "INSUFFICIENT_BALANCE",
-    });
-    return;
-  }
-
-  // Activate on Remnawave for recipient
-  let remnawaveUuid = recipient.remnawaveUuid;
-  let remnawaveShortUuid = recipient.remnawaveShortUuid;
-
-  try {
-    if (recipient.remnawaveUuid) {
-      await renewRemnawaveUserPlan(recipient.remnawaveUuid, plan.trafficLimitBytes, plan.validityDays);
-    } else {
-      const rwUser = await createRemnawaveUser(recipient.username, plan.trafficLimitBytes, plan.validityDays);
-      remnawaveUuid = rwUser.uuid ?? remnawaveUuid;
-      remnawaveShortUuid = rwUser.shortUuid ?? remnawaveShortUuid;
+    if (buyerResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Buyer not found" });
+      return;
     }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(502).json({ error: `Failed to activate VPN: ${msg}` });
-    return;
-  }
 
-  const newBuyerBalance = buyer.balanceKs - plan.priceKs;
+    const buyer = buyerResult.rows[0];
 
-  await Promise.all([
-    db.insert(planPurchasesTable).values({
-      userId: recipient.id,
+    // Cannot gift to yourself
+    if (buyer.username.toLowerCase() === recipientUsername.trim().toLowerCase()) {
+      await client.query("ROLLBACK");
+      res.status(400).json({ error: "You cannot gift a plan to yourself.", code: "SELF_GIFT" });
+      return;
+    }
+
+    // Lock recipient row
+    const recipientResult = await client.query(
+      "SELECT * FROM users WHERE username = $1 FOR UPDATE",
+      [recipientUsername.trim()],
+    );
+
+    if (recipientResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      res.status(404).json({
+        error: `No account found with username "${recipientUsername.trim()}". They need to register first.`,
+        code: "RECIPIENT_NOT_FOUND",
+      });
+      return;
+    }
+
+    const recipient = recipientResult.rows[0];
+
+    // Check recipient monthly purchase count
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const purchaseCountResult = await client.query(
+      "SELECT COUNT(*) as count FROM plan_purchases WHERE user_id = $1 AND purchased_at >= $2",
+      [recipient.id, monthStart],
+    );
+    const purchasesThisMonth = Number(purchaseCountResult.rows[0].count);
+
+    if (purchasesThisMonth >= MONTHLY_PURCHASE_LIMIT) {
+      await client.query("ROLLBACK");
+      res.status(403).json({
+        error: `${recipient.username} has already received ${MONTHLY_PURCHASE_LIMIT} plans this month. Their limit resets on the 1st of next month.`,
+        code: "RECIPIENT_MONTHLY_LIMIT_REACHED",
+      });
+      return;
+    }
+
+    // Downgrade rule
+    if (PREMIUM_PLAN_IDS.includes(recipient.plan_id ?? "") && planId === "starter") {
+      await client.query("ROLLBACK");
+      res.status(403).json({
+        error: `${recipient.username} is already on a Premium or Ultra plan. You cannot gift them a Starter plan.`,
+        code: "RECIPIENT_DOWNGRADE_BLOCKED",
+      });
+      return;
+    }
+
+    // Buyer balance check
+    if (buyer.balance_ks < plan.priceKs) {
+      await client.query("ROLLBACK");
+      res.status(402).json({
+        error: `Insufficient balance. You need ${plan.priceKs.toLocaleString()} Ks but have ${buyer.balance_ks.toLocaleString()} Ks.`,
+        code: "INSUFFICIENT_BALANCE",
+      });
+      return;
+    }
+
+    // Activate on Remnawave for recipient
+    let remnawaveUuid = recipient.remnawave_uuid;
+    let remnawaveShortUuid = recipient.remnawave_short_uuid;
+
+    try {
+      if (recipient.remnawave_uuid) {
+        await renewRemnawaveUserPlan(recipient.remnawave_uuid, plan.trafficLimitBytes, plan.validityDays);
+      } else {
+        const rwUser = await createRemnawaveUser(recipient.username, plan.trafficLimitBytes, plan.validityDays);
+        remnawaveUuid = rwUser.uuid ?? remnawaveUuid;
+        remnawaveShortUuid = rwUser.shortUuid ?? remnawaveShortUuid;
+      }
+    } catch (err) {
+      await client.query("ROLLBACK");
+      const msg = err instanceof Error ? err.message : String(err);
+      res.status(502).json({ error: `Failed to activate VPN: ${msg}` });
+      return;
+    }
+
+    const newBuyerBalance = buyer.balance_ks - plan.priceKs;
+
+    await client.query(
+      "INSERT INTO plan_purchases (user_id, plan_id, price_ks) VALUES ($1, $2, $3)",
+      [recipient.id, planId, String(plan.priceKs)],
+    );
+
+    await client.query(
+      "UPDATE users SET balance_ks = $1, updated_at = NOW() WHERE id = $2",
+      [newBuyerBalance, buyer.id],
+    );
+
+    await client.query(
+      "UPDATE users SET plan_id = $1, remnawave_uuid = $2, remnawave_short_uuid = $3, updated_at = NOW() WHERE id = $4",
+      [planId, remnawaveUuid, remnawaveShortUuid, recipient.id],
+    );
+
+    await client.query("COMMIT");
+
+    res.json({
+      success: true,
+      newBalance: newBuyerBalance,
+      recipientUsername: recipient.username,
       planId,
-      priceKs: String(plan.priceKs),
-    }),
-    db
-      .update(usersTable)
-      .set({ balanceKs: newBuyerBalance, updatedAt: new Date() })
-      .where(eq(usersTable.id, buyer.id)),
-    db
-      .update(usersTable)
-      .set({ planId, remnawaveUuid, remnawaveShortUuid, updatedAt: new Date() })
-      .where(eq(usersTable.id, recipient.id)),
-  ]);
-
-  res.json({
-    success: true,
-    newBalance: newBuyerBalance,
-    recipientUsername: recipient.username,
-    planId,
-    planName: plan.name,
-  });
+      planName: plan.name,
+    });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 });
 
 export default router;
