@@ -1,7 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { db, usersTable, topupRequestsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../middlewares/auth.js";
 import { sendTelegramPhoto, sendTelegramMessage } from "../lib/telegram.js";
 import { saveScreenshot } from "../lib/upload.js";
@@ -79,6 +79,7 @@ router.post(
 );
 
 router.get("/my", requireAuth, async (req: AuthRequest, res) => {
+  // Return in descending order so the newest request appears first
   const requests = await db
     .select({
       id: topupRequestsTable.id,
@@ -89,7 +90,8 @@ router.get("/my", requireAuth, async (req: AuthRequest, res) => {
       createdAt: topupRequestsTable.createdAt,
     })
     .from(topupRequestsTable)
-    .where(eq(topupRequestsTable.userId, req.user!.userId));
+    .where(eq(topupRequestsTable.userId, req.user!.userId))
+    .orderBy(desc(topupRequestsTable.createdAt));
 
   res.json(requests);
 });
