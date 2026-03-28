@@ -98,6 +98,15 @@ export interface AdminUser {
   createdAt: string;
 }
 
+export interface Announcement {
+  id: string;
+  title: string;
+  message: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const api = {
   register: (username: string, password: string, telegramId?: string): Promise<{ token: string; user: AuthUser }> =>
     apiFetch("/auth/register", { method: "POST", body: JSON.stringify({ username, password, ...(telegramId ? { telegramId } : {}) }) }),
@@ -140,6 +149,8 @@ export const api = {
 
   myTopups: (): Promise<TopupRequest[]> => apiFetch("/topup/my"),
 
+  activeAnnouncement: (): Promise<Announcement | null> => apiFetch("/admin/announcements/active"),
+
   admin: {
     topups: async (): Promise<AdminTopup[]> => {
       const response = await apiFetch("/admin/topups");
@@ -165,5 +176,11 @@ export const api = {
       apiFetch(`/admin/users/${userId}`, { method: "DELETE" }),
     cancelPackage: (userId: string): Promise<{ success: boolean; daysRemaining: number; refundKs: number; newBalance: number }> =>
       apiFetch(`/admin/users/${userId}/package`, { method: "DELETE" }),
+    // Announcement endpoints
+    announcements: (): Promise<Announcement[]> => apiFetch("/admin/announcements"),
+    createAnnouncement: (title: string, message: string): Promise<{ success: boolean; announcement: Announcement; sentTo: number }> =>
+      apiFetch("/admin/announcements", { method: "POST", body: JSON.stringify({ title, message }) }),
+    deleteAnnouncement: (id: string): Promise<{ success: boolean }> =>
+      apiFetch(`/admin/announcements/${id}`, { method: "DELETE" }),
   },
 };
