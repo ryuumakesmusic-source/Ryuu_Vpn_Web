@@ -10,18 +10,20 @@ const CRON_JOBS = [
   },
 ];
 
-function parseCron(schedule: string): number {
-  // Simple daily cron parser for "0 9 * * *" format
-  // Returns milliseconds until next run
+/**
+ * Returns milliseconds until the next run of a simple daily cron expression.
+ * Supports "M H * * *" format only (minute + hour, rest wildcards).
+ */
+function msUntilNextDailyRun(schedule: string): number {
   const parts = schedule.split(" ");
-  const minute = parseInt(parts[0]);
-  const hour = parseInt(parts[1]);
+  const minute = parseInt(parts[0], 10);
+  const hour = parseInt(parts[1], 10);
 
   const now = new Date();
   const next = new Date();
   next.setHours(hour, minute, 0, 0);
 
-  // If time has passed today, schedule for tomorrow
+  // If the time has already passed today, schedule for tomorrow
   if (next <= now) {
     next.setDate(next.getDate() + 1);
   }
@@ -29,7 +31,7 @@ function parseCron(schedule: string): number {
   return next.getTime() - now.getTime();
 }
 
-function runJob(job: typeof CRON_JOBS[0]) {
+function runJob(job: (typeof CRON_JOBS)[0]) {
   logger.info({ job: job.name }, "Running scheduled job");
 
   const child = spawn(job.command, job.args, {
@@ -51,20 +53,24 @@ function runJob(job: typeof CRON_JOBS[0]) {
   });
 }
 
-function scheduleJob(job: typeof CRON_JOBS[0]) {
-  const msUntilNext = parseCron(job.schedule);
-  const nextRun = new Date(Date.now() + msUntilNext);
+/**
+ * Schedules a daily job by calculating exact ms until next run, then
+ * re-calculating on each subsequent run (avoids drift from setInterval).
+ */
+function scheduleJob(job: (typeof CRON_JOBS)[0]) {
+  const msUntilFirst = msUntilNextDailyRun(job.schedule);
+  const nextRun = new Date(Date.now() + msUntilFirst);
 
-  logger.info(
-    { job: job.name, nextRun: nextRun.toISOString() },
-    "Scheduled job"
-  );
+  logger.info({ job: job.name, nextRun: nextRun.toISOString() }, "Scheduled job");
 
-  setTimeout(() => {
+  const tick = () => {
     runJob(job);
-    // Reschedule for next day (24 hours)
-    setInterval(() => runJob(job), 24 * 60 * 60 * 1000);
-  }, msUntilNext);
+    // Re-calculate next run time after each execution to avoid drift
+    const msUntilNext = msUntilNextDailyRun(job.schedule);
+    setTimeout(tick, msUntilNext);
+  };
+
+  setTimeout(tick, msUntilFirst);
 }
 
 export function startScheduler() {
