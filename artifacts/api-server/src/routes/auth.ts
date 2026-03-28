@@ -120,13 +120,13 @@ router.post("/login", loginLimiter, async (req, res) => {
   }
 
   // Save or update telegramId if provided
-  (req as any).log?.info({ username: user.username, telegramId: telegramId ?? null }, "Login telegramId received");
+  (req as any).log?.debug({ telegramId: telegramId ? "[REDACTED]" : null }, "Login telegramId received");
   if (telegramId && String(telegramId) !== user.telegramId) {
     await db
       .update(usersTable)
       .set({ telegramId: String(telegramId) })
       .where(eq(usersTable.id, user.id));
-    (req as any).log?.info({ username: user.username, telegramId: String(telegramId) }, "Saved telegramId to user");
+    (req as any).log?.debug({ username: user.username }, "Saved telegramId to user");
   }
 
   const token = signToken({ userId: user.id, username: user.username });

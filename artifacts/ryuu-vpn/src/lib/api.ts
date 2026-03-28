@@ -1,7 +1,37 @@
+// ─────────────────────────────────────────────────────────────────
+//  artifacts/ryuu-vpn/src/lib/api.ts  (FIXED)
+//
+//  Changes vs original:
+//  1. apiFetch no longer reads localStorage directly.
+//     It calls getToken() which is set by AuthProvider on every
+//     token change — this covers both localStorage and Telegram
+//     CloudStorage users.
+//  2. submitTopup uses the same getToken() for the Authorization
+//     header instead of its own localStorage.getItem call.
+// ─────────────────────────────────────────────────────────────────
+
 const API_BASE = "/api";
 
+// In-memory token reference — set by AuthProvider via setApiToken().
+// Avoids direct localStorage reads inside apiFetch, making it
+// compatible with Telegram CloudStorage (async) storage paths too.
+let _token: string | null = null;
+
+export function setApiToken(token: string | null) {
+  _token = token;
+}
+
+export function getApiToken(): string | null {
+  // Sync fallback: if AuthProvider hasn't hydrated yet, try localStorage.
+  // This only fires during the very first render before useEffect runs.
+  if (_token === null) {
+    _token = localStorage.getItem("ryuu_token");
+  }
+  return _token;
+}
+
 async function apiFetch(path: string, options: RequestInit = {}) {
-  const token = localStorage.getItem("ryuu_token");
+  const token = getApiToken();
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
@@ -131,7 +161,8 @@ export const api = {
     apiFetch("/dashboard/gift-plan", { method: "POST", body: JSON.stringify({ recipientUsername, planId }) }),
 
   submitTopup: (amountKs: number, paymentMethod: string, screenshot: File): Promise<{ id: string; status: string }> => {
-    const token = localStorage.getItem("ryuu_token");
+    // Use the same centralised token getter — covers Telegram CloudStorage users.
+    const token = getApiToken();
     const form = new FormData();
     form.append("amountKs", String(amountKs));
     form.append("paymentMethod", paymentMethod);
@@ -176,7 +207,6 @@ export const api = {
       apiFetch(`/admin/users/${userId}`, { method: "DELETE" }),
     cancelPackage: (userId: string): Promise<{ success: boolean; daysRemaining: number; refundKs: number; newBalance: number }> =>
       apiFetch(`/admin/users/${userId}/package`, { method: "DELETE" }),
-    // Announcement endpoints
     announcements: (): Promise<Announcement[]> => apiFetch("/admin/announcements"),
     createAnnouncement: (title: string, message: string): Promise<{ success: boolean; announcement: Announcement; sentTo: number }> =>
       apiFetch("/admin/announcements", { method: "POST", body: JSON.stringify({ title, message }) }),

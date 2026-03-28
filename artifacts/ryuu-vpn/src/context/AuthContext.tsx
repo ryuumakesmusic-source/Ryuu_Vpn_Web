@@ -1,5 +1,13 @@
+// ─────────────────────────────────────────────────────────────────
+//  artifacts/ryuu-vpn/src/context/AuthContext.tsx  (FIXED)
+//
+//  Changes vs original:
+//  1. Calls setApiToken() from api.ts on every token change so
+//     apiFetch and submitTopup always use the current token without
+//     touching localStorage directly.
+// ─────────────────────────────────────────────────────────────────
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-import { api, type AuthUser } from "@/lib/api";
+import { api, setApiToken, type AuthUser } from "@/lib/api";
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -16,7 +24,6 @@ const AuthContext = createContext<AuthContextType | null>(null);
 /**
  * Dual-storage helper: persists to localStorage (all envs) and
  * Telegram CloudStorage (Telegram Mini App only).
- * All console.log calls removed — they were leaking auth state to production.
  */
 const storage = {
   async getItem(key: string): Promise<string | null> {
@@ -77,35 +84,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Keep the api module's in-memory token in sync so apiFetch
+  // never has to read localStorage directly.
+  const persistToken = (t: string | null) => {
+    setToken(t);
+    setApiToken(t);
+  };
+
   useEffect(() => {
     storage.getItem("ryuu_token").then((savedToken) => {
       if (!savedToken) {
         setLoading(false);
         return;
       }
-      setToken(savedToken);
+      persistToken(savedToken);
       api
         .me()
         .then((u) => setUser(u))
         .catch(() => {
           storage.removeItem("ryuu_token");
-          setToken(null);
+          persistToken(null);
         })
         .finally(() => setLoading(false));
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const login = async (username: string, password: string) => {
     const res = await api.login(username, password, getTelegramId());
     await storage.setItem("ryuu_token", res.token);
-    setToken(res.token);
+    persistToken(res.token);
     setUser(res.user);
   };
 
   const register = async (username: string, password: string) => {
     const res = await api.register(username, password, getTelegramId());
     await storage.setItem("ryuu_token", res.token);
-    setToken(res.token);
+    persistToken(res.token);
     setUser(res.user);
   };
 
@@ -116,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await storage.removeItem("ryuu_token");
-    setToken(null);
+    persistToken(null);
     setUser(null);
   };
 

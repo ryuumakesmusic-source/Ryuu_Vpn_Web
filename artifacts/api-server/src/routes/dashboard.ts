@@ -1,4 +1,13 @@
+// ─────────────────────────────────────────────────────────────────
+//  artifacts/api-server/src/routes/dashboard.ts  (FIXED)
+//
+//  Changes vs original:
+//  1. Added buyPlanLimiter and giftPlanLimiter (10 req / 10 min)
+//     applied to POST /buy-plan and POST /gift-plan respectively.
+// ─────────────────────────────────────────────────────────────────
+
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { db, usersTable, planPurchasesTable, pool } from "@workspace/db";
 import { eq, and, gte, count } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../middlewares/auth.js";
@@ -12,6 +21,24 @@ import { getPlan, PLANS } from "../lib/plans.js";
 import { MONTHLY_PURCHASE_LIMIT, PREMIUM_PLAN_IDS } from "../lib/constants.js";
 
 const router = Router();
+
+/** Max 10 plan purchases per IP per 10 minutes. */
+const buyPlanLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many purchase attempts. Please wait a few minutes and try again." },
+});
+
+/** Max 10 gift operations per IP per 10 minutes. */
+const giftPlanLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many gift attempts. Please wait a few minutes and try again." },
+});
 
 router.get("/stats", requireAuth, async (req: AuthRequest, res) => {
   const [user] = await db
@@ -130,7 +157,8 @@ router.get("/purchase-status", requireAuth, async (req: AuthRequest, res) => {
   });
 });
 
-router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
+// Rate limiter applied: 10 attempts / 10 min per IP
+router.post("/buy-plan", requireAuth, buyPlanLimiter, async (req: AuthRequest, res) => {
   const { planId } = req.body as { planId: string };
 
   const plan = getPlan(planId);
@@ -143,7 +171,6 @@ router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
   try {
     await client.query("BEGIN");
 
-    // Lock the user row to prevent concurrent balance modifications
     const userResult = await client.query(
       "SELECT * FROM users WHERE id = $1 FOR UPDATE",
       [req.user!.userId],
@@ -157,7 +184,6 @@ router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
 
     const user = userResult.rows[0];
 
-    // Rule 1 — max purchases per calendar month
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const purchaseCountResult = await client.query(
@@ -175,7 +201,6 @@ router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
       return;
     }
 
-    // Rule 2 — no downgrade: Premium/Ultra users cannot buy Starter
     if (PREMIUM_PLAN_IDS.includes(user.plan_id ?? "") && planId === "starter") {
       await client.query("ROLLBACK");
       res.status(403).json({
@@ -185,7 +210,6 @@ router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
       return;
     }
 
-    // Rule 3 — sufficient balance (checked within transaction)
     if (user.balance_ks < plan.priceKs) {
       await client.query("ROLLBACK");
       res.status(402).json({
@@ -253,7 +277,8 @@ router.post("/buy-plan", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-router.post("/gift-plan", requireAuth, async (req: AuthRequest, res) => {
+// Rate limiter applied: 10 attempts / 10 min per IP
+router.post("/gift-plan", requireAuth, giftPlanLimiter, async (req: AuthRequest, res) => {
   const { recipientUsername, planId } = req.body as {
     recipientUsername: string;
     planId: string;
@@ -269,7 +294,6 @@ router.post("/gift-plan", requireAuth, async (req: AuthRequest, res) => {
   try {
     await client.query("BEGIN");
 
-    // Lock buyer row
     const buyerResult = await client.query(
       "SELECT * FROM users WHERE id = $1 FOR UPDATE",
       [req.user!.userId],
@@ -283,14 +307,12 @@ router.post("/gift-plan", requireAuth, async (req: AuthRequest, res) => {
 
     const buyer = buyerResult.rows[0];
 
-    // Cannot gift to yourself
     if (buyer.username.toLowerCase() === recipientUsername.trim().toLowerCase()) {
       await client.query("ROLLBACK");
       res.status(400).json({ error: "You cannot gift a plan to yourself.", code: "SELF_GIFT" });
       return;
     }
 
-    // Lock recipient row
     const recipientResult = await client.query(
       "SELECT * FROM users WHERE username = $1 FOR UPDATE",
       [recipientUsername.trim()],
@@ -307,7 +329,6 @@ router.post("/gift-plan", requireAuth, async (req: AuthRequest, res) => {
 
     const recipient = recipientResult.rows[0];
 
-    // Check recipient monthly purchase count
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const purchaseCountResult = await client.query(
@@ -325,7 +346,6 @@ router.post("/gift-plan", requireAuth, async (req: AuthRequest, res) => {
       return;
     }
 
-    // Downgrade rule
     if (PREMIUM_PLAN_IDS.includes(recipient.plan_id ?? "") && planId === "starter") {
       await client.query("ROLLBACK");
       res.status(403).json({
@@ -335,7 +355,6 @@ router.post("/gift-plan", requireAuth, async (req: AuthRequest, res) => {
       return;
     }
 
-    // Buyer balance check
     if (buyer.balance_ks < plan.priceKs) {
       await client.query("ROLLBACK");
       res.status(402).json({
@@ -345,7 +364,6 @@ router.post("/gift-plan", requireAuth, async (req: AuthRequest, res) => {
       return;
     }
 
-    // Activate on Remnawave for recipient
     let remnawaveUuid = recipient.remnawave_uuid;
     let remnawaveShortUuid = recipient.remnawave_short_uuid;
 

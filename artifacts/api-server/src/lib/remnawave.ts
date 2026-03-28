@@ -1,9 +1,30 @@
+// ─────────────────────────────────────────────────────────────────
+//  artifacts/api-server/src/lib/remnawave.ts  (FIXED)
+//
+//  Changes vs original:
+//  1. Replaced fragile string-match retry guard with a proper numeric
+//     status check. 4xx (except 429 Too Many Requests) are not
+//     retried. 429 and 5xx are retried with exponential backoff.
+//  2. Stored status code on the thrown error object so callers can
+//     inspect it without parsing the message string.
+// ─────────────────────────────────────────────────────────────────
+
 const DEFAULT_SQUAD_UUID = "cc8bf98f-8581-4dd0-b7ff-bc9c93a3cc61";
 
 const REMNAWAVE_TIMEOUT_MS = 15_000;
 
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+class RemnawaveApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "RemnawaveApiError";
+  }
 }
 
 async function rwFetch(path: string, options: RequestInit = {}, retries = 3) {
@@ -34,12 +55,21 @@ async function rwFetch(path: string, options: RequestInit = {}, retries = 3) {
 
       if (!res.ok) {
         const text = await res.text();
-        const error = new Error(`Remnawave API error ${res.status}: ${text}`);
-        // Don't retry on client errors (4xx) — these won't succeed on retry
-        if (res.status >= 400 && res.status < 500) {
+        const error = new RemnawaveApiError(
+          `Remnawave API error ${res.status}: ${text}`,
+          res.status,
+        );
+
+        // Don't retry on client errors (4xx) EXCEPT 429 (rate-limit).
+        // 429 should be retried after backoff. All 5xx errors are retried.
+        const isClientError = res.status >= 400 && res.status < 500;
+        const isRateLimit = res.status === 429;
+
+        if (isClientError && !isRateLimit) {
           throw error;
         }
-        throw error;
+
+        throw error; // will be caught below and may retry
       }
 
       return res.json();
@@ -47,11 +77,13 @@ async function rwFetch(path: string, options: RequestInit = {}, retries = 3) {
       clearTimeout(timer);
       lastError = err instanceof Error ? err : new Error(String(err));
 
-      // Don't retry on client errors (4xx) or request timeouts
-      if (
-        lastError.message.includes("Remnawave API error 4") ||
-        lastError.name === "AbortError"
-      ) {
+      // Never retry on:
+      //   - AbortError (timeout) — the server already timed out once
+      //   - 4xx that are not 429 (bad request, auth error, not found, etc.)
+      const status = (lastError as RemnawaveApiError).status ?? 0;
+      const isHardClientError = status >= 400 && status < 500 && status !== 429;
+
+      if (lastError.name === "AbortError" || isHardClientError) {
         throw lastError;
       }
 
