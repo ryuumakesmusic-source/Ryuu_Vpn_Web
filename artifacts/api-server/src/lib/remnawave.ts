@@ -1,5 +1,7 @@
 const DEFAULT_SQUAD_UUID = "cc8bf98f-8581-4dd0-b7ff-bc9c93a3cc61";
 
+const REMNAWAVE_TIMEOUT_MS = 15_000;
+
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -14,46 +16,54 @@ async function rwFetch(path: string, options: RequestInit = {}, retries = 3) {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < retries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REMNAWAVE_TIMEOUT_MS);
+
     try {
       const res = await fetch(url, {
         ...options,
+        signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${API_KEY}`,
+          Authorization: `Bearer ${API_KEY}`,
           ...options.headers,
         },
       });
 
+      clearTimeout(timer);
+
       if (!res.ok) {
         const text = await res.text();
         const error = new Error(`Remnawave API error ${res.status}: ${text}`);
-        
-        // Don't retry on client errors (4xx)
+        // Don't retry on client errors (4xx) — these won't succeed on retry
         if (res.status >= 400 && res.status < 500) {
           throw error;
         }
-        
         throw error;
       }
 
       return res.json();
     } catch (err) {
+      clearTimeout(timer);
       lastError = err instanceof Error ? err : new Error(String(err));
-      
-      // Don't retry on client errors (4xx)
-      if (lastError.message.includes("error 4")) {
+
+      // Don't retry on client errors (4xx) or request timeouts
+      if (
+        lastError.message.includes("Remnawave API error 4") ||
+        lastError.name === "AbortError"
+      ) {
         throw lastError;
       }
 
-      // If not the last attempt, wait before retrying
+      // Wait before retrying (exponential backoff, max 5s)
       if (attempt < retries - 1) {
-        const delay = Math.min(1000 * Math.pow(2, attempt), 5000); // Max 5s
+        const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
         await sleep(delay);
       }
     }
   }
 
-  throw lastError || new Error("Remnawave API request failed");
+  throw lastError || new Error("Remnawave API request failed after retries");
 }
 
 export interface RemnawaveUser {
@@ -95,23 +105,20 @@ export async function renewRemnawaveUserPlan(
   additionalTrafficBytes: number,
   validityDays: number,
 ): Promise<RemnawaveUser> {
-  // Fetch current state so we can calculate rollover
+  // Fetch current state to calculate data rollover
   const current = await rwFetch(`/api/users/${uuid}`);
   const currentUser: RemnawaveUser = current?.response ?? current;
   const usedBytes: number = currentUser.usedTrafficBytes ?? 0;
   const currentLimitBytes: number = currentUser.trafficLimitBytes ?? 0;
 
-  // Unused data from the old plan, capped at the new plan's full allocation
-  // e.g. 90 GB remaining + buy Pro (120 GB) → carry over 90 GB (under cap)
-  //      200 GB remaining + buy Pro (120 GB) → carry over 120 GB (capped)
+  // Roll over unused data, capped at the new plan's full allocation
   const unusedBytes = Math.max(0, currentLimitBytes - usedBytes);
   const rolloverBytes = Math.min(unusedBytes, additionalTrafficBytes);
 
-  // New limit = already used + fresh plan GB + rolled-over GB
-  // Remaining after renewal = additionalTrafficBytes + rolloverBytes (max 2× new plan)
+  // New limit = used so far + fresh plan data + rollover
   const newTrafficLimitBytes = usedBytes + additionalTrafficBytes + rolloverBytes;
 
-  // Expiry starts fresh from today + plan validity
+  // Expiry starts fresh from today
   const expireAt = new Date();
   expireAt.setDate(expireAt.getDate() + validityDays);
 
