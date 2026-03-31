@@ -669,6 +669,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 25.3.5
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.1(@types/pg@8.18.0)(pg@8.20.0)
       esbuild:
         specifier: 0.27.3
         version: 0.27.3

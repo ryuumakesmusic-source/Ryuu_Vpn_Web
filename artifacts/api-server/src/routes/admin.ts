@@ -42,7 +42,7 @@ router.get("/topups", requireAdmin, async (req, res) => {
 });
 
 router.get("/topups/:id/screenshot", requireAdmin, async (req, res) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   const [topup] = await db
     .select({ screenshotUrl: topupRequestsTable.screenshotUrl })
@@ -59,7 +59,7 @@ router.get("/topups/:id/screenshot", requireAdmin, async (req, res) => {
 });
 
 router.post("/topups/:id/approve", requireAdmin, async (req: AdminRequest, res) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { adminNote } = req.body as { adminNote?: string };
 
   const [topup] = await db
@@ -129,7 +129,7 @@ router.post("/topups/:id/approve", requireAdmin, async (req: AdminRequest, res) 
 });
 
 router.post("/topups/:id/reject", requireAdmin, async (req: AdminRequest, res) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { adminNote } = req.body as { adminNote?: string };
 
   const [topup] = await db
@@ -221,7 +221,7 @@ router.get("/users", requireAdmin, async (req, res) => {
 });
 
 router.post("/users/:id/set-admin", requireAdmin, async (req: AdminRequest, res) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { isAdmin } = req.body as { isAdmin: boolean };
 
   if (id === req.user!.userId) {
@@ -238,7 +238,7 @@ router.post("/users/:id/set-admin", requireAdmin, async (req: AdminRequest, res)
 });
 
 router.post("/users/:id/set-balance", requireAdmin, async (req: AdminRequest, res) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { balanceKs } = req.body as { balanceKs: number };
 
   if (typeof balanceKs !== "number" || balanceKs < 0 || !Number.isInteger(balanceKs)) {
@@ -260,7 +260,7 @@ router.post("/users/:id/set-balance", requireAdmin, async (req: AdminRequest, re
 });
 
 router.post("/users/:id/adjust-balance", requireAdmin, async (req: AdminRequest, res) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { delta } = req.body as { delta: number };
 
   if (typeof delta !== "number" || !Number.isInteger(delta) || delta === 0) {
@@ -295,7 +295,7 @@ router.post("/users/:id/adjust-balance", requireAdmin, async (req: AdminRequest,
 });
 
 router.delete("/users/:id/package", requireAdmin, async (req: AdminRequest, res) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   const [user] = await db
     .select()
@@ -381,7 +381,7 @@ router.delete("/users/:id/package", requireAdmin, async (req: AdminRequest, res)
 });
 
 router.delete("/users/:id", requireAdmin, async (req: AdminRequest, res) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   if (id === req.user!.userId) {
     res.status(400).json({ error: "You cannot delete your own account" });
@@ -471,7 +471,7 @@ router.post("/announcements", requireAdmin, async (req: AdminRequest, res) => {
 });
 
 router.delete("/announcements/:id", requireAdmin, async (req: AdminRequest, res) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   
   await pool.query("DELETE FROM announcements WHERE id = $1", [id]);
   

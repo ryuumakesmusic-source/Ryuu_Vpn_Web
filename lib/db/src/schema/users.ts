@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, uuid, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+import type { z } from "zod/v4";
 
 export const usersTable = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
