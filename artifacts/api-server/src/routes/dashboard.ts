@@ -153,7 +153,7 @@ router.get("/purchase-status", requireAuth, async (req: AuthRequest, res) => {
     monthlyLimit: MONTHLY_PURCHASE_LIMIT,
     remainingPurchases: Math.max(0, MONTHLY_PURCHASE_LIMIT - Number(purchasesThisMonth)),
     currentPlanId: user?.planId ?? null,
-    canBuyStarter: !PREMIUM_PLAN_IDS.includes(user?.planId ?? ""),
+    canBuyStarter: !(PREMIUM_PLAN_IDS as readonly string[]).includes(user?.planId ?? ""),
   });
 });
 
@@ -201,7 +201,7 @@ router.post("/buy-plan", requireAuth, buyPlanLimiter, async (req: AuthRequest, r
       return;
     }
 
-    if (PREMIUM_PLAN_IDS.includes(user.plan_id ?? "") && planId === "starter") {
+    if ((PREMIUM_PLAN_IDS as readonly string[]).includes(user.plan_id ?? "") && planId === "starter") {
       await client.query("ROLLBACK");
       res.status(403).json({
         error: "Your current plan is Premium or Ultra. You cannot downgrade to Starter. Please choose Premium or Ultra.",
@@ -346,7 +346,7 @@ router.post("/gift-plan", requireAuth, giftPlanLimiter, async (req: AuthRequest,
       return;
     }
 
-    if (PREMIUM_PLAN_IDS.includes(recipient.plan_id ?? "") && planId === "starter") {
+    if ((PREMIUM_PLAN_IDS as readonly string[]).includes(recipient.plan_id ?? "") && planId === "starter") {
       await client.query("ROLLBACK");
       res.status(403).json({
         error: `${recipient.username} is already on a Premium or Ultra plan. You cannot gift them a Starter plan.`,

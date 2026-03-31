@@ -27,7 +27,10 @@ class RemnawaveApiError extends Error {
   }
 }
 
-async function rwFetch(path: string, options: RequestInit = {}, retries = 3) {
+/** Opaque JSON response from the Remnawave API (may wrap the payload under `response`). */
+type RwJson = Record<string, unknown>;
+
+async function rwFetch(path: string, options: RequestInit = {}, retries = 3): Promise<RwJson> {
   const BASE_URL = process.env.REMNAWAVE_URL;
   const API_KEY = process.env.REMNAWAVE_API_KEY;
   if (!BASE_URL) throw new Error("REMNAWAVE_URL is not configured on this server");
@@ -72,7 +75,7 @@ async function rwFetch(path: string, options: RequestInit = {}, retries = 3) {
         throw error; // will be caught below and may retry
       }
 
-      return res.json();
+      return res.json() as Promise<RwJson>;
     } catch (err) {
       clearTimeout(timer);
       lastError = err instanceof Error ? err : new Error(String(err));
@@ -109,6 +112,17 @@ export interface RemnawaveUser {
   subscriptionUrl: string;
 }
 
+/** Subscription info returned by /api/subscriptions/by-uuid/:uuid */
+export interface RemnawaveSubscription {
+  subscriptionUrl?: string;
+  shortUuid?: string;
+  user?: {
+    trafficUsedBytes?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
 export async function createRemnawaveUser(
   username: string,
   trafficLimitBytes: number,
@@ -129,7 +143,7 @@ export async function createRemnawaveUser(
     method: "POST",
     body: JSON.stringify(body),
   });
-  return data?.response ?? data;
+  return (data?.response ?? data) as RemnawaveUser;
 }
 
 export async function renewRemnawaveUserPlan(
@@ -139,7 +153,7 @@ export async function renewRemnawaveUserPlan(
 ): Promise<RemnawaveUser> {
   // Fetch current state to calculate data rollover
   const current = await rwFetch(`/api/users/${uuid}`);
-  const currentUser: RemnawaveUser = current?.response ?? current;
+  const currentUser = (current?.response ?? current) as RemnawaveUser;
   const usedBytes: number = currentUser.usedTrafficBytes ?? 0;
   const currentLimitBytes: number = currentUser.trafficLimitBytes ?? 0;
 
@@ -163,7 +177,7 @@ export async function renewRemnawaveUserPlan(
       activeInternalSquads: [DEFAULT_SQUAD_UUID],
     }),
   });
-  return data?.response ?? data;
+  return (data?.response ?? data) as RemnawaveUser;
 }
 
 export async function deleteRemnawaveUser(uuid: string): Promise<void> {
@@ -172,7 +186,7 @@ export async function deleteRemnawaveUser(uuid: string): Promise<void> {
 
 export async function getRemnawaveUser(uuid: string): Promise<RemnawaveUser> {
   const data = await rwFetch(`/api/users/${uuid}`);
-  return data?.response ?? data;
+  return (data?.response ?? data) as RemnawaveUser;
 }
 
 export async function getUserBandwidth(uuid: string) {
@@ -184,10 +198,10 @@ export async function getUserBandwidth(uuid: string) {
   }
 }
 
-export async function getSubscription(uuid: string) {
+export async function getSubscription(uuid: string): Promise<RemnawaveSubscription | null> {
   try {
     const data = await rwFetch(`/api/subscriptions/by-uuid/${uuid}`);
-    return data?.response ?? data;
+    return (data?.response ?? data) as RemnawaveSubscription;
   } catch {
     return null;
   }

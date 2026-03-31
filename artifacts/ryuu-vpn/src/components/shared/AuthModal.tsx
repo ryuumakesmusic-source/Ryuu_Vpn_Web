@@ -12,8 +12,10 @@ import { useToast } from "@/hooks/use-toast";
 
 export function AuthModal({
   children,
+  defaultPlan,
 }: {
   children: React.ReactNode;
+  defaultPlan?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"login" | "register">("login");
@@ -45,7 +47,7 @@ export function AuthModal({
       }
       setOpen(false);
       reset();
-      navigate("/dashboard");
+      navigate(defaultPlan ? `/dashboard?plan=${defaultPlan}` : "/dashboard");
     } catch (err) {
       toast({
         title: "Error",

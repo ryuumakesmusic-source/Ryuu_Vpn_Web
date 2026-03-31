@@ -2,8 +2,7 @@ import { AuthModal } from "@/components/shared/AuthModal";
 import { motion } from "framer-motion";
 
 export function Hero() {
-  const logoUrl =
-    "https://assets.streamlinehq.com/image/private/w_300,h_300,ar_1/f_auto/v1/icons/interface-essential/check-badge-89c8o2nllxjypnppfmi9xm.png/check-badge-t05f9l6xba1iwy9pjudt.png?_a=DATAiZAAZAA0";
+  const logoUrl = "/logo.svg";
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">

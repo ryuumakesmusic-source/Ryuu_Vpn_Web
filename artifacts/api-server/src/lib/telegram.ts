@@ -34,7 +34,11 @@ export async function sendTelegramPhoto(
       form.append("chat_id", chatId);
       form.append("caption", caption);
       form.append("parse_mode", "HTML");
-      const blob = new Blob([imageBuffer], { type: mimeType });
+      const arrayBuffer = imageBuffer.buffer.slice(
+        imageBuffer.byteOffset,
+        imageBuffer.byteOffset + imageBuffer.byteLength,
+      ) as ArrayBuffer;
+      const blob = new Blob([arrayBuffer], { type: mimeType });
       form.append("photo", blob, "screenshot.jpg");
 
       await fetch(`https://api.telegram.org/bot${NOTI_BOT_TOKEN}/sendPhoto`, {
